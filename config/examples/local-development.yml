@@ -1,0 +1,64 @@
+# Local Development Configuration
+# Configuration for local AL extension development
+
+repository:
+  type: "local-development"
+  workspace_path: "/workspace"
+  reference_path: "/bc-reference"
+  description: "Local AL extension development environment"
+  
+workspace:
+  watch_files: true
+  auto_refresh: true
+  scan_depth: 3
+  include_hidden: false
+  
+file_patterns:
+  al_files: "**/*.al"
+  app_json: "**/app.json"
+  ignore_patterns:
+    - ".git/**"
+    - ".vscode/**"
+    - ".alpackages/**"
+    - "bin/**"
+    - "obj/**"
+
+indexing:
+  enabled: true
+  include_obsolete: true
+  include_details: true
+  real_time_updates: true
+  cache_duration: "1h"
+
+features:
+  workspace_analysis: true
+  dependency_validation: true
+  stm_guidelines: true
+  appsource_compliance: false
+  
+development:
+  hot_reload: true
+  error_detection: true
+  syntax_validation: true
+  code_completion_support: true
+
+settings:
+  project_detection: "auto"
+  namespace_inference: true
+  object_id_validation: true
+  
+performance:
+  file_watcher_debounce: "500ms"
+  index_batch_size: 50
+  search_cache_size: 500
+  memory_limit: "256MB"
+
+logging:
+  level: "debug"
+  include_file_operations: true
+  log_workspace_changes: true
+  
+monitoring:
+  health_check_interval: "10s"
+  file_system_monitoring: true
+  performance_tracking: true

@@ -1,0 +1,72 @@
+# Enterprise BC Fork Configuration
+# Configuration for enterprise BC fork repositories
+
+repository:
+  type: "bc-fork"
+  url: "https://github.com/enterprise-corp/BCApps.git"
+  description: "Enterprise BC fork with custom modifications"
+  auth_required: true
+  auth_token_file: "/run/secrets/git_token"
+  
+branches:
+  default:
+    - "main"
+    - "enterprise-v2024"
+    - "w1-26"
+  track_pattern: "enterprise-*"
+  upstream_tracking: true
+  max_branches: 20
+  auto_cleanup: true
+  cleanup_interval: "48h"
+
+enterprise:
+  custom_modules: true
+  track_modifications: true
+  upstream_sync: true
+  compliance_validation: true
+  
+indexing:
+  enabled: true
+  include_obsolete: false
+  include_details: true
+  track_customizations: true
+  cache_duration: "24h"
+
+features:
+  fork_analysis: true
+  modification_tracking: true
+  upstream_comparison: true
+  security_scanning: true
+  license_compliance: true
+
+settings:
+  shallow_clone: false
+  track_all_branches: false
+  object_filters:
+    exclude_microsoft_objects: false
+    include_custom_only: false
+    namespace_filter: "Enterprise.*,Custom.*"
+  
+security:
+  secret_scanning: true
+  token_rotation: true
+  access_logging: true
+  audit_trail: true
+
+performance:
+  max_concurrent_operations: 6
+  index_batch_size: 150
+  search_cache_size: 2000
+  memory_limit: "1GB"
+
+logging:
+  level: "info"
+  include_security_events: true
+  log_access_patterns: true
+  audit_modifications: true
+  
+monitoring:
+  health_check_interval: "60s"
+  upstream_drift_detection: true
+  security_alerts: true
+  compliance_monitoring: true

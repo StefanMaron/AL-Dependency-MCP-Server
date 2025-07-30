@@ -1,0 +1,80 @@
+version: '3.8'
+
+# Example 1: Microsoft BC Repository (default)
+x-al-mcp-base: &al-mcp-base
+  build: .
+  ports:
+    - "3000:3000"
+  restart: unless-stopped
+
+services:
+  # BC History Sandbox Repository (Stefan Maron's managed repository)
+  al-mcp-bc-history:
+    <<: *al-mcp-base
+    container_name: al-mcp-bc-history
+    ports:
+      - "3000:3000"
+    volumes:
+      - repo-cache-bc-sandbox:/app/repo-cache
+      - index-cache-bc-sandbox:/app/index-cache
+    environment:
+      - NODE_ENV=production
+      - REPO_TYPE=bc-history-sandbox
+      - REPO_URL=https://github.com/StefanMaron/MSDyn365BC.Sandbox.Code.History.git
+      - DEFAULT_BRANCHES=w1-26,w1-24
+      - AUTO_CLEANUP=true
+      - CLEANUP_INTERVAL=24h
+      - MAX_BRANCHES=10
+
+  # Local Development Environment
+  al-mcp-local:
+    <<: *al-mcp-base
+    container_name: al-mcp-local
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./examples/MyExtension:/workspace:ro
+      - ./examples/BCApps:/bc-reference:ro
+      - index-cache-local:/app/index-cache
+    environment:
+      - NODE_ENV=development
+      - REPO_TYPE=local-development
+      - WORKSPACE_PATH=/workspace
+      - REFERENCE_PATH=/bc-reference
+      - WATCH_FILES=true
+      - LOG_LEVEL=debug
+    profiles:
+      - local
+
+  # Enterprise BC Fork
+  al-mcp-enterprise:
+    <<: *al-mcp-base
+    container_name: al-mcp-enterprise
+    ports:
+      - "3002:3000"
+    volumes:
+      - repo-cache-enterprise:/app/repo-cache
+      - index-cache-enterprise:/app/index-cache
+    environment:
+      - NODE_ENV=production
+      - REPO_TYPE=bc-fork
+      - REPO_URL=https://github.com/acme-corp/BCApps.git
+      - DEFAULT_BRANCHES=main,enterprise-v2024
+      - AUTH_TOKEN_FILE=/run/secrets/git_token
+    secrets:
+      - git_token
+    profiles:
+      - enterprise
+
+
+volumes:
+  repo-cache-bc-sandbox:
+  index-cache-bc-sandbox:
+  repo-cache-local:
+  index-cache-local:
+  repo-cache-enterprise:
+  index-cache-enterprise:
+
+secrets:
+  git_token:
+    file: ./secrets/git-token.txt

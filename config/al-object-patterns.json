@@ -1,0 +1,447 @@
+{
+  "version": "1.0.0",
+  "description": "AL object recognition patterns and parsing rules",
+  "objectTypes": {
+    "table": {
+      "pattern": "^\\s*table\\s+(\\d+)\\s+([\"\\w\\s]+)\\s*$",
+      "flags": "i",
+      "groups": {
+        "id": 1,
+        "name": 2
+      },
+      "keywords": ["table", "fields", "keys", "triggers"],
+      "filePrefix": ["Tab", "Table"],
+      "idRange": {
+        "microsoft": "1-49999",
+        "pte": "50000-99999", 
+        "appSource": "100000-999999999"
+      }
+    },
+    "tableextension": {
+      "pattern": "^\\s*tableextension\\s+(\\d+)\\s+([\"\\w\\s]+)\\s+extends\\s+([\"\\w\\s]+)\\s*$",
+      "flags": "i",
+      "groups": {
+        "id": 1,
+        "name": 2,
+        "extends": 3
+      },
+      "keywords": ["tableextension", "extends", "fields", "keys"],
+      "filePrefix": ["TabExt", "TableExt"],
+      "idRange": {
+        "pte": "50000-99999",
+        "appSource": "100000-999999999"
+      }
+    },
+    "page": {
+      "pattern": "^\\s*page\\s+(\\d+)\\s+([\"\\w\\s]+)\\s*$",
+      "flags": "i",
+      "groups": {
+        "id": 1,
+        "name": 2
+      },
+      "keywords": ["page", "layout", "actions", "triggers"],
+      "filePrefix": ["Pag", "Page"],
+      "pageTypes": [
+        "Card", "List", "ListPart", "CardPart", "Document", "Worksheet",
+        "RoleCenter", "NavigatePage", "ConfirmationDialog", "StandardDialog",
+        "HeadlinePart", "PromptDialog", "API"
+      ],
+      "idRange": {
+        "microsoft": "1-49999",
+        "pte": "50000-99999",
+        "appSource": "100000-999999999"
+      }
+    },
+    "pageextension": {
+      "pattern": "^\\s*pageextension\\s+(\\d+)\\s+([\"\\w\\s]+)\\s+extends\\s+([\"\\w\\s]+)\\s*$",
+      "flags": "i",
+      "groups": {
+        "id": 1,
+        "name": 2,
+        "extends": 3
+      },
+      "keywords": ["pageextension", "extends", "layout", "actions"],
+      "filePrefix": ["PagExt", "PageExt"],
+      "idRange": {
+        "pte": "50000-99999",
+        "appSource": "100000-999999999"
+      }
+    },
+    "codeunit": {
+      "pattern": "^\\s*codeunit\\s+(\\d+)\\s+([\"\\w\\s]+)\\s*$",
+      "flags": "i",
+      "groups": {
+        "id": 1,
+        "name": 2
+      },
+      "keywords": ["codeunit", "procedure", "trigger", "var"],
+      "filePrefix": ["Cod", "Codeunit"],
+      "subtypes": [
+        "Normal", "Test", "TestRunner", "Upgrade", "Install"
+      ],
+      "idRange": {
+        "microsoft": "1-49999",
+        "pte": "50000-99999",
+        "appSource": "100000-999999999"
+      }
+    },
+    "report": {
+      "pattern": "^\\s*report\\s+(\\d+)\\s+([\"\\w\\s]+)\\s*$",
+      "flags": "i",
+      "groups": {
+        "id": 1,
+        "name": 2
+      },
+      "keywords": ["report", "dataset", "layout", "requestpage"],
+      "filePrefix": ["Rep", "Report"],
+      "layoutTypes": ["RDLC", "Word", "Excel"],
+      "idRange": {
+        "microsoft": "1-49999",
+        "pte": "50000-99999",
+        "appSource": "100000-999999999"
+      }
+    },
+    "query": {
+      "pattern": "^\\s*query\\s+(\\d+)\\s+([\"\\w\\s]+)\\s*$",
+      "flags": "i",
+      "groups": {
+        "id": 1,
+        "name": 2
+      },
+      "keywords": ["query", "elements", "dataitem"],
+      "filePrefix": ["Que", "Query"],
+      "idRange": {
+        "microsoft": "1-49999",
+        "pte": "50000-99999",
+        "appSource": "100000-999999999"
+      }
+    },
+    "enum": {
+      "pattern": "^\\s*enum\\s+(\\d+)\\s+([\"\\w\\s]+)\\s*$",
+      "flags": "i",
+      "groups": {
+        "id": 1,
+        "name": 2
+      },
+      "keywords": ["enum", "value"],
+      "filePrefix": ["Enu", "Enum"],
+      "idRange": {
+        "microsoft": "1-49999",
+        "pte": "50000-99999",
+        "appSource": "100000-999999999"
+      }
+    },
+    "enumextension": {
+      "pattern": "^\\s*enumextension\\s+(\\d+)\\s+([\"\\w\\s]+)\\s+extends\\s+([\"\\w\\s]+)\\s*$",
+      "flags": "i",
+      "groups": {
+        "id": 1,
+        "name": 2,
+        "extends": 3
+      },
+      "keywords": ["enumextension", "extends", "value"],
+      "filePrefix": ["EnuExt", "EnumExt"],
+      "idRange": {
+        "pte": "50000-99999",
+        "appSource": "100000-999999999"
+      }
+    },
+    "interface": {
+      "pattern": "^\\s*interface\\s+([\"\\w\\s]+)\\s*$",
+      "flags": "i",
+      "groups": {
+        "name": 1
+      },
+      "keywords": ["interface", "procedure"],
+      "filePrefix": ["Int", "Interface"],
+      "noId": true
+    },
+    "permissionset": {
+      "pattern": "^\\s*permissionset\\s+(\\d+)\\s+([\"\\w\\s]+)\\s*$",
+      "flags": "i",
+      "groups": {
+        "id": 1,
+        "name": 2
+      },
+      "keywords": ["permissionset", "permissions"],
+      "filePrefix": ["Per", "Permission"],
+      "idRange": {
+        "microsoft": "1-49999",
+        "pte": "50000-99999",
+        "appSource": "100000-999999999"
+      }
+    },
+    "xmlport": {
+      "pattern": "^\\s*xmlport\\s+(\\d+)\\s+([\"\\w\\s]+)\\s*$",
+      "flags": "i",
+      "groups": {
+        "id": 1,
+        "name": 2
+      },
+      "keywords": ["xmlport", "schema", "elements"],
+      "filePrefix": ["Xml", "XmlPort"],
+      "idRange": {
+        "microsoft": "1-49999",
+        "pte": "50000-99999",
+        "appSource": "100000-999999999"
+      }
+    },
+    "controladdin": {
+      "pattern": "^\\s*controladdin\\s+([\"\\w\\s]+)\\s*$",
+      "flags": "i",
+      "groups": {
+        "name": 1
+      },
+      "keywords": ["controladdin", "scripts", "stylesheets"],
+      "filePrefix": ["Con", "Control"],
+      "noId": true
+    },
+    "profile": {
+      "pattern": "^\\s*profile\\s+([\"\\w\\s]+)\\s*$",
+      "flags": "i",
+      "groups": {
+        "name": 1
+      },
+      "keywords": ["profile", "customizes"],
+      "filePrefix": ["Pro", "Profile"],
+      "noId": true
+    },
+    "pagecustomization": {
+      "pattern": "^\\s*pagecustomization\\s+([\"\\w\\s]+)\\s+customizes\\s+([\"\\w\\s]+)\\s*$",
+      "flags": "i",
+      "groups": {
+        "name": 1,
+        "customizes": 2
+      },
+      "keywords": ["pagecustomization", "customizes", "layout"],
+      "filePrefix": ["PagCus", "PageCustomization"],
+      "noId": true
+    },
+    "reportextension": {
+      "pattern": "^\\s*reportextension\\s+(\\d+)\\s+([\"\\w\\s]+)\\s+extends\\s+([\"\\w\\s]+)\\s*$",
+      "flags": "i",
+      "groups": {
+        "id": 1,
+        "name": 2,
+        "extends": 3
+      },
+      "keywords": ["reportextension", "extends", "dataset"],
+      "filePrefix": ["RepExt", "ReportExt"],
+      "idRange": {
+        "pte": "50000-99999",
+        "appSource": "100000-999999999"
+      }
+    }
+  },
+  "properties": {
+    "common": {
+      "Caption": {
+        "pattern": "Caption\\s*=\\s*'([^']+)'",
+        "flags": "i"
+      },
+      "Description": {
+        "pattern": "Description\\s*=\\s*'([^']+)'",
+        "flags": "i"
+      },
+      "ObsoleteState": {
+        "pattern": "ObsoleteState\\s*=\\s*(\\w+)",
+        "flags": "i",
+        "values": ["No", "Pending", "Removed"]
+      },
+      "ObsoleteReason": {
+        "pattern": "ObsoleteReason\\s*=\\s*'([^']+)'",
+        "flags": "i"
+      },
+      "ObsoleteTag": {
+        "pattern": "ObsoleteTag\\s*=\\s*'([^']+)'",
+        "flags": "i"
+      },
+      "Access": {
+        "pattern": "Access\\s*=\\s*(\\w+)",
+        "flags": "i",
+        "values": ["Public", "Internal", "Local"]
+      },
+      "Extensible": {
+        "pattern": "Extensible\\s*=\\s*(true|false)",
+        "flags": "i"
+      }
+    },
+    "table": {
+      "DataClassification": {
+        "pattern": "DataClassification\\s*=\\s*(\\w+)",
+        "flags": "i",
+        "values": ["CustomerContent", "ToBeClassified", "EndUserIdentifiableInformation", "AccountData", "EndUserPseudonymousIdentifiers", "OrganizationIdentifiableInformation", "SystemMetadata"]
+      },
+      "TableType": {
+        "pattern": "TableType\\s*=\\s*(\\w+)",
+        "flags": "i",
+        "values": ["Normal", "Temporary", "CRM"]
+      }
+    },
+    "page": {
+      "PageType": {
+        "pattern": "PageType\\s*=\\s*(\\w+)",
+        "flags": "i"
+      },
+      "SourceTable": {
+        "pattern": "SourceTable\\s*=\\s*([^;]+)",
+        "flags": "i"
+      },
+      "UsageCategory": {
+        "pattern": "UsageCategory\\s*=\\s*(\\w+)",
+        "flags": "i",
+        "values": ["Lists", "Tasks", "ReportsAndAnalysis", "Documents", "History", "Administration"]
+      },
+      "ApplicationArea": {
+        "pattern": "ApplicationArea\\s*=\\s*([^;]+)",
+        "flags": "i"
+      }
+    },
+    "codeunit": {
+      "Subtype": {
+        "pattern": "Subtype\\s*=\\s*(\\w+)",
+        "flags": "i"
+      },
+      "SingleInstance": {
+        "pattern": "SingleInstance\\s*=\\s*(true|false)",
+        "flags": "i"
+      }
+    }
+  },
+  "sections": {
+    "fields": {
+      "pattern": "^\\s*fields\\s*$",
+      "flags": "i",
+      "applicableTo": ["table", "tableextension"]
+    },
+    "keys": {
+      "pattern": "^\\s*keys\\s*$",
+      "flags": "i",
+      "applicableTo": ["table", "tableextension"]
+    },
+    "layout": {
+      "pattern": "^\\s*layout\\s*$",
+      "flags": "i",
+      "applicableTo": ["page", "pageextension"]
+    },
+    "actions": {
+      "pattern": "^\\s*actions\\s*$",
+      "flags": "i",
+      "applicableTo": ["page", "pageextension"]
+    },
+    "dataset": {
+      "pattern": "^\\s*dataset\\s*$",
+      "flags": "i",
+      "applicableTo": ["report", "reportextension"]
+    },
+    "requestpage": {
+      "pattern": "^\\s*requestpage\\s*$",
+      "flags": "i",
+      "applicableTo": ["report"]
+    },
+    "schema": {
+      "pattern": "^\\s*schema\\s*$",
+      "flags": "i",
+      "applicableTo": ["xmlport"]
+    },
+    "elements": {
+      "pattern": "^\\s*elements\\s*$",
+      "flags": "i",
+      "applicableTo": ["query", "xmlport"]
+    },
+    "value": {
+      "pattern": "^\\s*value\\s*$",
+      "flags": "i",
+      "applicableTo": ["enum", "enumextension"]
+    },
+    "permissions": {
+      "pattern": "^\\s*permissions\\s*$",
+      "flags": "i",
+      "applicableTo": ["permissionset"]
+    }
+  },
+  "fieldTypes": {
+    "basic": [
+      "Boolean", "Integer", "BigInteger", "Decimal", "Code", "Text", 
+      "Date", "Time", "DateTime", "Option", "Enum", "Guid"
+    ],
+    "complex": [
+      "RecordId", "TableFilter", "OemText", "OemCode", "InStream", 
+      "OutStream", "Variant", "Media", "MediaSet", "Blob"
+    ],
+    "reference": [
+      "RecordRef", "FieldRef", "KeyRef", "TestPage"
+    ]
+  },
+  "triggers": {
+    "table": [
+      "OnInsert", "OnModify", "OnDelete", "OnRename", 
+      "OnValidate", "OnLookup"
+    ],
+    "field": [
+      "OnValidate", "OnLookup"
+    ],
+    "page": [
+      "OnInit", "OnOpenPage", "OnClosePage", "OnFindRecord", 
+      "OnNextRecord", "OnAfterGetRecord", "OnNewRecord", 
+      "OnInsertRecord", "OnModifyRecord", "OnDeleteRecord",
+      "OnQueryClosePage"
+    ],
+    "control": [
+      "OnValidate", "OnLookup", "OnDrillDown", "OnAssistEdit",
+      "OnAfterValidate", "OnBeforeValidate"
+    ],
+    "action": [
+      "OnAction"
+    ],
+    "codeunit": [
+      "OnRun"
+    ],
+    "report": [
+      "OnInitReport", "OnPreReport", "OnPostReport"
+    ],
+    "dataitem": [
+      "OnPreDataItem", "OnAfterGetRecord", "OnPostDataItem"
+    ]
+  },
+  "events": {
+    "integrationEvents": [
+      "OnBeforeInsert", "OnAfterInsert", "OnBeforeModify", 
+      "OnAfterModify", "OnBeforeDelete", "OnAfterDelete"
+    ],
+    "businessEvents": [
+      "OnCustomerCreated", "OnOrderProcessed", "OnPaymentReceived"
+    ]
+  },
+  "namespaces": {
+    "microsoft": {
+      "patterns": ["Microsoft.*", "System.*"],
+      "description": "Microsoft base application namespaces"
+    },
+    "custom": {
+      "patterns": ["[A-Z][A-Za-z0-9]*\\.[A-Z][A-Za-z0-9]*"],
+      "description": "Custom namespace pattern"
+    }
+  },
+  "validation": {
+    "naming": {
+      "objectName": {
+        "pattern": "^[A-Z][A-Za-z0-9\\s]*$",
+        "description": "Object names should start with capital letter and use PascalCase"
+      },
+      "fieldName": {
+        "pattern": "^[A-Z][A-Za-z0-9]*$",
+        "description": "Field names should use PascalCase without spaces"
+      },
+      "procedureName": {
+        "pattern": "^[A-Z][A-Za-z0-9]*$",
+        "description": "Procedure names should use PascalCase"
+      }
+    },
+    "idRanges": {
+      "validateRanges": true,
+      "enforceCustomRange": false,
+      "customRange": "50000-99999"
+    }
+  }
+}

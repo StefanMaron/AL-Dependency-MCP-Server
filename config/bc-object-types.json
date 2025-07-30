@@ -1,0 +1,397 @@
+{
+  "version": "1.0.0",
+  "description": "Business Central object type definitions and metadata",
+  "bcVersions": {
+    "w1-26": {
+      "version": "26.0",
+      "platform": "26.0.0.0",
+      "runtime": "13.0",
+      "releaseDate": "2024-10-01",
+      "supportedUntil": "2025-10-01"
+    },
+    "w1-25": {
+      "version": "25.0", 
+      "platform": "25.0.0.0",
+      "runtime": "12.0",
+      "releaseDate": "2024-04-01",
+      "supportedUntil": "2025-04-01"
+    },
+    "w1-24": {
+      "version": "24.0",
+      "platform": "24.0.0.0", 
+      "runtime": "11.0",
+      "releaseDate": "2023-10-01",
+      "supportedUntil": "2024-10-01"
+    }
+  },
+  "applications": {
+    "Base Application": {
+      "id": "437dbf0e-84ff-417a-965d-ed2bb9650972",
+      "publisher": "Microsoft",
+      "description": "Core Business Central functionality",
+      "objectRanges": {
+        "table": "1-2000000000",
+        "page": "1-2000000000", 
+        "codeunit": "1-2000000000",
+        "report": "1-2000000000"
+      }
+    },
+    "System Application": {
+      "id": "63ca2fa4-4f03-4f2b-a480-172fef340d3f",
+      "publisher": "Microsoft",
+      "description": "System-level functionality and utilities",
+      "objectRanges": {
+        "table": "2000000001-2000000999",
+        "page": "2000000001-2000000999",
+        "codeunit": "2000000001-2000000999"
+      }
+    },
+    "Application": {
+      "id": "c1335042-3002-4257-bf8a-75c898ccb1b8", 
+      "publisher": "Microsoft",
+      "description": "Business logic and application objects",
+      "dependencies": ["Base Application", "System Application"]
+    }
+  },
+  "objectCategories": {
+    "masterData": {
+      "description": "Master data objects (customers, vendors, items, etc.)",
+      "tables": [18, 23, 27, 36, 37, 38],
+      "pages": [21, 22, 26, 27, 30, 31],
+      "keywords": ["Customer", "Vendor", "Item", "Resource", "Employee"]
+    },
+    "transactions": {
+      "description": "Transaction and document objects",
+      "tables": [36, 37, 38, 110, 112, 114],
+      "pages": [42, 43, 50, 51, 9300, 9301],
+      "keywords": ["Sales", "Purchase", "Invoice", "Order", "Quote"]
+    },
+    "setup": {
+      "description": "Setup and configuration objects", 
+      "tables": [98, 242, 311, 312, 313],
+      "pages": [9, 348, 459, 460, 461],
+      "keywords": ["Setup", "Configuration", "Options", "Parameters"]
+    },
+    "journals": {
+      "description": "Journal and posting objects",
+      "tables": [81, 83, 210, 271, 5601],
+      "pages": [39, 40, 251, 252, 5601],
+      "keywords": ["Journal", "Batch", "Line", "Posting"]
+    },
+    "reports": {
+      "description": "Standard Business Central reports",
+      "reports": [101, 102, 103, 104, 105, 106, 107, 108],
+      "keywords": ["Statement", "List", "Analysis", "Statistics"]
+    },
+    "administration": {
+      "description": "System administration objects",
+      "tables": [2000000001, 2000000002, 2000000003],
+      "pages": [2000000001, 2000000002, 2000000003],
+      "keywords": ["User", "Permission", "Profile", "Company"]
+    }
+  },
+  "moduleStructure": {
+    "Financial Management": {
+      "description": "General ledger, banking, and financial reporting",
+      "folders": ["FinancialMgt", "Bank", "CashFlow"],
+      "objectRanges": {
+        "table": "15-389",
+        "page": "9-574", 
+        "codeunit": "1-374",
+        "report": "1-19"
+      },
+      "keyObjects": {
+        "tables": ["G/L Account", "G/L Entry", "Bank Account"],
+        "pages": ["Chart of Accounts", "General Journal", "Bank Account Card"],
+        "codeunits": ["Gen. Jnl.-Post Line", "Bank Acc. Reconciliation Post"]
+      }
+    },
+    "Sales & Receivables": {
+      "description": "Sales processes and customer management",
+      "folders": ["Sales"],
+      "objectRanges": {
+        "table": "36-114",
+        "page": "21-9094",
+        "codeunit": "80-415",
+        "report": "101-210"
+      },
+      "keyObjects": {
+        "tables": ["Customer", "Sales Header", "Sales Line"],
+        "pages": ["Customer Card", "Sales Order", "Sales Invoice"],
+        "codeunits": ["Sales-Post", "Sales-Post (Yes/No)"]
+      }
+    },
+    "Purchases & Payables": {
+      "description": "Purchase processes and vendor management", 
+      "folders": ["Purchases"],
+      "objectRanges": {
+        "table": "23-131",
+        "page": "26-9094",
+        "codeunit": "90-415",
+        "report": "301-410"
+      },
+      "keyObjects": {
+        "tables": ["Vendor", "Purchase Header", "Purchase Line"],
+        "pages": ["Vendor Card", "Purchase Order", "Purchase Invoice"],
+        "codeunits": ["Purch.-Post", "Purch.-Post (Yes/No)"]
+      }
+    },
+    "Inventory": {
+      "description": "Item management and inventory operations",
+      "folders": ["Inventory"],
+      "objectRanges": {
+        "table": "27-5907",
+        "page": "30-9094", 
+        "codeunit": "22-5930",
+        "report": "701-1699"
+      },
+      "keyObjects": {
+        "tables": ["Item", "Item Ledger Entry", "Location"],
+        "pages": ["Item Card", "Item List", "Item Ledger Entries"],
+        "codeunits": ["Item Jnl.-Post Line", "Inventory Posting"]
+      }
+    },
+    "Manufacturing": {
+      "description": "Production and manufacturing processes",
+      "folders": ["Manufacturing"],
+      "objectRanges": {
+        "table": "5400-5899",
+        "page": "5400-5899",
+        "codeunit": "5400-5899", 
+        "report": "99000750-99001599"
+      },
+      "keyObjects": {
+        "tables": ["Production Order", "Prod. Order Line", "Work Center"],
+        "pages": ["Production Order", "Released Production Orders"],
+        "codeunits": ["Prod. Order Status Management"]
+      }
+    },
+    "Warehouse Management": {
+      "description": "Warehouse and logistics operations",
+      "folders": ["Warehouse"],
+      "objectRanges": {
+        "table": "5760-5859",
+        "page": "5760-5859",
+        "codeunit": "5760-5859",
+        "report": "7300-7399"
+      },
+      "keyObjects": {
+        "tables": ["Warehouse Entry", "Warehouse Activity Header"],
+        "pages": ["Warehouse Entries", "Warehouse Activity"],
+        "codeunits": ["Warehouse Management"]
+      }
+    },
+    "Human Resources": {
+      "description": "Employee and HR management",
+      "folders": ["HumanResources"],
+      "objectRanges": {
+        "table": "5200-5299",
+        "page": "5200-5299",
+        "codeunit": "5200-5299",
+        "report": "1100-1199"
+      },
+      "keyObjects": {
+        "tables": ["Employee", "Human Resource Unit of Measure"],
+        "pages": ["Employee Card", "Employee List"],
+        "codeunits": ["Human Resource Management"]
+      }
+    },
+    "Service Management": {
+      "description": "Service orders and maintenance",
+      "folders": ["Service"],
+      "objectRanges": {
+        "table": "5900-6085",
+        "page": "5900-6085",
+        "codeunit": "5900-6085",
+        "report": "5900-5999"
+      },
+      "keyObjects": {
+        "tables": ["Service Header", "Service Line", "Service Item"],
+        "pages": ["Service Order", "Service Items"],
+        "codeunits": ["Service-Post"]
+      }
+    }
+  },
+  "permissions": {
+    "systemPermissions": [
+      "SUPER", "SECURITY", "D365 BASIC", "D365 TEAM MEMBER", 
+      "D365 FULL USER", "EXTERNAL ACCOUNTANT"
+    ],
+    "objectPermissions": {
+      "Read": "R",
+      "Insert": "I", 
+      "Modify": "M",
+      "Delete": "D",
+      "Execute": "X"
+    },
+    "permissionSets": {
+      "D365 BASIC": {
+        "description": "Basic Business Central permissions",
+        "includes": ["Basic financial operations", "Read access to master data"]
+      },
+      "D365 FULL USER": {
+        "description": "Full user permissions for Business Central",
+        "includes": ["All business operations", "Setup and configuration"]
+      }
+    }
+  },
+  "dataTypes": {
+    "primitive": {
+      "Boolean": {
+        "size": 1,
+        "description": "True/False values"
+      },
+      "Integer": {
+        "size": 4,
+        "range": "-2,147,483,647 to 2,147,483,647",
+        "description": "32-bit integer"
+      },
+      "BigInteger": {
+        "size": 8,
+        "range": "-9,223,372,036,854,775,807 to 9,223,372,036,854,775,807",
+        "description": "64-bit integer"
+      },
+      "Decimal": {
+        "size": 16,
+        "precision": "18 digits",
+        "description": "Decimal number with high precision"
+      },
+      "Code": {
+        "maxLength": 250,
+        "description": "Fixed-length alphanumeric string"
+      },
+      "Text": {
+        "maxLength": 2048,
+        "description": "Variable-length text string"
+      },
+      "Date": {
+        "range": "01/01/1753 to 12/31/9999",
+        "description": "Date value"
+      },
+      "Time": {
+        "range": "00:00:00 to 23:59:59.999",
+        "description": "Time value"
+      },
+      "DateTime": {
+        "description": "Combined date and time value"
+      }
+    },
+    "complex": {
+      "Guid": {
+        "format": "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX",
+        "description": "Globally unique identifier"
+      },
+      "RecordId": {
+        "description": "Reference to a specific record"
+      },
+      "Media": {
+        "description": "Single media file attachment"
+      },
+      "MediaSet": {
+        "description": "Collection of media files"
+      },
+      "Blob": {
+        "description": "Binary large object for file storage"
+      }
+    }
+  },
+  "applicationAreas": {
+    "All": "Global application area",
+    "Basic": "Basic Business Central functionality",
+    "Suite": "Full Business Central suite",
+    "Advanced": "Advanced features",
+    "Invoicing": "Invoicing functionality",
+    "Items": "Item management",
+    "Location": "Multi-location functionality",
+    "Warehouse": "Warehouse management",
+    "Manufacturing": "Manufacturing processes",
+    "Planning": "Planning and scheduling",
+    "Service": "Service management",
+    "Jobs": "Project management",
+    "Resources": "Resource planning",
+    "TimeSheets": "Time tracking",
+    "ADCS": "Automated Data Capture Systems",
+    "Assembly": "Assembly management",
+    "CostAccounting": "Cost accounting",
+    "Dimensions": "Financial dimensions",
+    "FixedAssets": "Fixed asset management",
+    "Intercompany": "Intercompany transactions",
+    "Prepayments": "Prepayment handling"
+  },
+  "events": {
+    "integrationEvents": {
+      "description": "Events for third-party integration",
+      "naming": "On[Action][Object]",
+      "examples": [
+        "OnBeforePostSalesDoc",
+        "OnAfterCreateCustomer", 
+        "OnValidateItemNo"
+      ]
+    },
+    "businessEvents": {
+      "description": "Business process events", 
+      "naming": "On[BusinessProcess]",
+      "examples": [
+        "OnCustomerBlocked",
+        "OnSalesOrderApproved",
+        "OnInventoryLow"
+      ]
+    }
+  },
+  "extensionGuidelines": {
+    "appSource": {
+      "idRange": "100000-999999999",
+      "mandatoryProperties": [
+        "Caption", "Description", "ApplicationArea"
+      ],
+      "forbiddenModifications": [
+        "Microsoft objects", "System tables"
+      ]
+    },
+    "pte": {
+      "idRange": "50000-99999",
+      "recommendations": [
+        "Use meaningful object names",
+        "Follow Microsoft naming conventions",
+        "Include proper documentation"
+      ]
+    }
+  },
+  "migration": {
+    "deprecatedObjects": {
+      "w1-25": [
+        {
+          "type": "codeunit",
+          "id": 1234,
+          "name": "Old Payment Processing",
+          "replacement": "New Payment Management",
+          "reason": "Replaced with improved payment handling"
+        }
+      ]
+    },
+    "newFeatures": {
+      "w1-26": [
+        {
+          "category": "API",
+          "feature": "Enhanced REST APIs",
+          "description": "Improved API performance and new endpoints"
+        },
+        {
+          "category": "Platform",
+          "feature": "Improved AL Language Server",
+          "description": "Better IntelliSense and debugging capabilities"
+        }
+      ]
+    },
+    "breakingChanges": {
+      "w1-26": [
+        {
+          "type": "interface",
+          "name": "Payment Interface",
+          "change": "Method signature changed",
+          "impact": "Extensions implementing this interface need updates"
+        }
+      ]
+    }
+  }
+}
