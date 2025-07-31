@@ -29,7 +29,8 @@ export interface RepositoryConfig {
   type: RepositoryType;
   url?: string;
   path?: string;
-  defaultBranches: string[];
+  defaultBranch?: string;
+  cloneDepth?: number;
   maxBranches?: number;
   autoCleanup?: boolean;
   cleanupInterval?: string;

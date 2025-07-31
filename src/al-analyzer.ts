@@ -1,8 +1,7 @@
-import { promises as fs } from 'fs';
-import path from 'path';
 import { Logger } from 'winston';
-import { ALParser } from './al-parser.js';
-import { GitManager } from './git-manager.js';
+import path from 'path';
+import { ALParser } from './al-parser';
+import { GitManager } from './git-manager';
 import {
   ALObject,
   ObjectReference,
@@ -10,13 +9,14 @@ import {
   DependencyGraph,
   ALTable,
   ALCodeunit,
-  ALPage
-} from './types/al-objects.js';
+  ALPage,
+  PermissionInfo
+} from './types/al-objects';
 import {
   ALObjectType,
   RelationshipType,
   ExtensionDependency
-} from './types/al-types.js';
+} from './types/al-types';
 
 export interface RelationshipOptions {
   relationshipType: RelationshipType;
@@ -31,10 +31,10 @@ export class ALAnalyzer {
   private objectCache: Map<string, ALObject[]> = new Map();
   private dependencyGraph: Map<string, DependencyGraph> = new Map();
 
-  constructor(logger: Logger) {
+  constructor(logger: Logger, gitManager?: GitManager) {
     this.logger = logger;
     this.parser = new ALParser(logger);
-    this.gitManager = new GitManager(logger);
+    this.gitManager = gitManager || new GitManager(logger);
   }
 
   async getObject(
@@ -45,27 +45,129 @@ export class ALAnalyzer {
       include_dependencies?: boolean;
       include_events?: boolean;
       include_permissions?: boolean;
+      include_summary_only?: boolean;
+      include_procedures?: boolean;
+      include_variables?: boolean;
+      include_triggers?: boolean;
+      max_procedures?: number;
+      max_variables?: number;
+      include_source_code?: boolean;
     } = {}
   ): Promise<any> {
-    this.logger.info(`Getting object: ${objectType} ${identifier}`, { branch, options });
+    this.logger.info(`Getting object: ${objectType} ${identifier}`, { 
+      branch, 
+      options, 
+      identifierType: typeof identifier 
+    });
 
     const objects = await this.getObjectsFromBranch(branch);
-    const targetObject = objects.find(obj => 
-      obj.type === objectType && 
-      (obj.name === identifier || obj.id === identifier)
-    );
+    
+    this.logger.debug(`Found ${objects.length} objects in branch`, {
+      branch: branch || 'current',
+      objectTypes: [...new Set(objects.map(o => o.type))],
+      sampleObjects: objects.slice(0, 5).map(o => ({ type: o.type, name: o.name, id: o.id }))
+    });
+
+    const targetObject = objects.find(obj => {
+      if (obj.type !== objectType) return false;
+      
+      // Name match (string comparison)
+      if (typeof identifier === 'string' && obj.name === identifier) return true;
+      
+      // ID match (obj.id is always number type according to ALObject interface)
+      if (obj.id !== undefined) {
+        if (typeof identifier === 'number') {
+          return obj.id === identifier;
+        }
+        if (typeof identifier === 'string') {
+          const numericId = parseInt(identifier);
+          return !isNaN(numericId) && obj.id === numericId;
+        }
+      }
+      
+      return false;
+    });
 
     if (!targetObject) {
-      throw new Error(`Object not found: ${objectType} ${identifier}`);
+      // Provide more debugging information
+      const matchingType = objects.filter(obj => obj.type === objectType);
+      this.logger.error(`Object not found`, {
+        objectType,
+        identifier,
+        identifierType: typeof identifier,
+        totalObjects: objects.length,
+        matchingTypeCount: matchingType.length,
+        availableIds: matchingType.map(o => o.id).filter(id => id !== undefined).slice(0, 10),
+        availableNames: matchingType.map(o => o.name).slice(0, 10)
+      });
+      
+      throw new Error(`Object not found: ${objectType} ${identifier}. Found ${matchingType.length} objects of type ${objectType}`);
     }
 
-    const result: any = {
-      ...targetObject,
-      metadata: {
-        analyzedAt: new Date().toISOString(),
-        branch: branch || 'current'
+    let result: any;
+
+    // If summary only requested, return minimal info
+    if (options.include_summary_only) {
+      result = {
+        type: targetObject.type,
+        id: targetObject.id,
+        name: targetObject.name,
+        namespace: targetObject.namespace,
+        caption: targetObject.caption,
+        filePath: targetObject.filePath,
+        branch: targetObject.branch,
+        lineNumber: targetObject.lineNumber,
+        isObsolete: targetObject.isObsolete,
+        obsoleteReason: targetObject.obsoleteReason,
+        access: targetObject.access,
+        extensible: targetObject.extensible,
+        metadata: {
+          analyzedAt: new Date().toISOString(),
+          branch: branch || 'current',
+          responseType: 'summary'
+        }
+      };
+    } else {
+      // Full object, but apply filtering
+      result = { ...targetObject };
+      
+      // Apply content filtering for large objects
+      if (targetObject.type === 'codeunit' && 'procedures' in targetObject) {
+        const codeunit = targetObject as any;
+        if (options.include_procedures !== false && codeunit.procedures) {
+          if (options.max_procedures && codeunit.procedures.length > options.max_procedures) {
+            result.procedures = codeunit.procedures.slice(0, options.max_procedures);
+            result.proceduresTruncated = true;
+            result.totalProcedures = codeunit.procedures.length;
+          }
+        } else if (options.include_procedures === false) {
+          delete result.procedures;
+        }
+
+        if (options.include_variables === false) {
+          delete result.variables;
+        } else if (options.max_variables && codeunit.variables && codeunit.variables.length > options.max_variables) {
+          result.variables = codeunit.variables.slice(0, options.max_variables);
+          result.variablesTruncated = true;
+          result.totalVariables = codeunit.variables.length;
+        }
+
+        if (options.include_triggers === false) {
+          delete result.triggers;
+        }
       }
-    };
+
+      // Apply similar filtering for other object types
+      if ((targetObject.type === 'table' || targetObject.type === 'page') && options.include_triggers === false) {
+        delete result.triggers;
+      }
+
+      result.metadata = {
+        analyzedAt: new Date().toISOString(),
+        branch: branch || 'current',
+        responseType: 'filtered'
+      };
+    }
 
     if (options.include_dependencies) {
       result.dependencies = await this.getObjectDependencies(targetObject);
@@ -79,7 +181,45 @@ export class ALAnalyzer {
       result.permissions = await this.getObjectPermissions(targetObject);
     }
 
+    // Include source code if requested
+    if (options.include_source_code) {
+      try {
+        result.sourceCode = await this.gitManager.getFileContent(targetObject.filePath, targetObject.branch);
+        this.logger.debug(`Retrieved source code for ${targetObject.type} ${targetObject.name}`, {
+          sourceCodeLength: result.sourceCode?.length || 0
+        });
+      } catch (error) {
+        this.logger.warn(`Failed to retrieve source code for ${targetObject.type} ${targetObject.name}`, { error });
+        result.sourceCodeError = 'Failed to retrieve source code';
+      }
+    }
+
+    // Add size estimation to help users understand response size
+    const estimatedTokens = this.estimateResponseTokens(result);
+    result.metadata.estimatedTokens = estimatedTokens;
+    
+    // If response might be too large, add guidance
+    if (estimatedTokens > 20000) {
+      result.metadata.sizeWarning = {
+        message: 'This response may be large. Consider using filtering options to reduce size.',
+        suggestions: [
+          'Use include_summary_only: true for basic info only',
+          'Use include_procedures: false to exclude procedures',
+          'Use max_procedures: 10 to limit procedure count',
+          'Use include_variables: false to exclude variables',
+          'Use include_triggers: false to exclude triggers',
+          'Use include_source_code: false to exclude source code (usually the largest part)'
+        ]
+      };
+    }
+
     return result;
+  }
+
+  private estimateResponseTokens(obj: any): number {
+    // Rough estimation: 1 token per 4 characters on average
+    const jsonString = JSON.stringify(obj);
+    return Math.ceil(jsonString.length / 4);
   }
 
   async findRelationships(
@@ -144,7 +284,7 @@ export class ALAnalyzer {
     }
 
     // Get repository root path and parse AL files
-    const repoPath = '/app/repo-cache'; // This should come from GitManager
+    const repoPath = process.env.REPO_CACHE_PATH || path.join(process.cwd(), '.cache', 'repo-cache');
     const parseResult = await this.parser.parseDirectory(
       repoPath,
       branchKey,
@@ -170,11 +310,22 @@ export class ALAnalyzer {
   }
 
   private findObjectByName(objects: ALObject[], name: string): ALObject | undefined {
-    return objects.find(obj => 
-      obj.name === name || 
-      obj.name.replace(/["]/g, '') === name ||
-      (obj.id && obj.id.toString() === name)
-    );
+    return objects.find(obj => {
+      // Exact name match
+      if (obj.name === name) return true;
+      
+      // Name without quotes
+      if (obj.name.replace(/["]/g, '') === name) return true;
+      
+      // ID match (obj.id is always number type)
+      if (obj.id !== undefined) {
+        if (obj.id.toString() === name) return true;
+        const numericName = parseInt(name);
+        if (!isNaN(numericName) && obj.id === numericName) return true;
+      }
+      
+      return false;
+    });
   }
 
   private async traverseRelationships(
@@ -237,11 +388,15 @@ export class ALAnalyzer {
 
     // Find extends relationships
     if ((relationshipType === 'extends' || relationshipType === 'all') && 'extends' in obj && obj.extends) {
-      relationships.push({
-        source: objRef,
-        target: obj.extends,
-        type: 'extends'
-      });
+      // Type guard to ensure obj.extends is properly typed
+      const extendsRef = obj.extends as ObjectReference;
+      if (extendsRef && extendsRef.type && extendsRef.name) {
+        relationships.push({
+          source: objRef,
+          target: extendsRef,
+          type: 'extends'
+        });
+      }
     }
 
     // Find implements relationships
@@ -309,7 +464,12 @@ export class ALAnalyzer {
       permissions.push({
         objectType: 'table',
         objectId: obj.id!,
-        permissions: Object.entries(tablePerms).map(([key, value]) => `${key}:${value}`)
+        permissions: {
+          read: tablePerms.read,
+          insert: tablePerms.insert,
+          modify: tablePerms.modify,
+          delete: tablePerms.delete
+        }
       });
     }
 

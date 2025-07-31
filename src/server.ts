@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/// <reference types="node" />
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
@@ -8,14 +9,14 @@ import {
   ErrorCode,
   McpError,
 } from '@modelcontextprotocol/sdk/types.js';
-import { GitManager } from './git-manager.js';
-import { ALParser } from './al-parser.js';
-import { ALAnalyzer } from './al-analyzer.js';
-import { SearchIndexer } from './search-indexer.js';
-import { RepositoryDetector } from './repository-detector.js';
+import { GitManager } from './git-manager';
+import { ALParser } from './al-parser';
+import { ALAnalyzer } from './al-analyzer';
+import { SearchIndexer } from './search-indexer';
+import { RepositoryDetector } from './repository-detector';
 import { createLogger, Logger } from 'winston';
-import { RepositoryConfig, WorkspaceConfig, ALObjectType, RelationshipType, BranchType } from './types/al-types.js';
-import { MCPTool } from './types/mcp-types.js';
+import { RepositoryConfig, WorkspaceConfig, ALObjectType, RelationshipType, BranchType } from './types/al-types';
+import { MCPTool } from './types/mcp-types';
 
 class ALMCPServer {
   private server: Server;
@@ -44,17 +45,20 @@ class ALMCPServer {
       level: process.env.LOG_LEVEL || 'info',
       format: this.getLogFormat(),
       transports: [
-        new (require('winston')).transports.Console()
+        new (require('winston')).transports.File({ filename: '/tmp/al-mcp-server.log' })
       ]
     });
 
     this.gitManager = new GitManager(this.logger);
     this.alParser = new ALParser(this.logger);
-    this.alAnalyzer = new ALAnalyzer(this.logger);
-    this.searchIndexer = new SearchIndexer(this.logger);
+    this.alAnalyzer = new ALAnalyzer(this.logger, this.gitManager);
+    this.searchIndexer = new SearchIndexer(this.logger, this.gitManager);
     this.repositoryDetector = new RepositoryDetector(this.logger);
 
     this.setupHandlers();
+    
+    // Initialize on startup
+    this.initializeAsync();
   }
 
   private getLogFormat() {
@@ -107,11 +111,20 @@ class ALMCPServer {
     });
   }
 
-  private async ensureInitialized(): Promise<void> {
-    if (this.isInitialized) return;
-
+  private async initializeAsync(): Promise<void> {
     try {
       this.logger.info('Initializing AL MCP Server...');
+      
+      // Debug environment variables
+      this.logger.info('Environment variables check', {
+        NODE_ENV: process.env.NODE_ENV,
+        REPO_TYPE: process.env.REPO_TYPE,
+        REPO_URL: process.env.REPO_URL,
+        DEFAULT_BRANCH: process.env.DEFAULT_BRANCH,
+        CLONE_DEPTH: process.env.CLONE_DEPTH,
+        AUTO_CLEANUP: process.env.AUTO_CLEANUP,
+        allEnvKeys: Object.keys(process.env).filter(key => key.includes('DEFAULT') || key.includes('BRANCH') || key.includes('REPO'))
+      });
       
       const repoConfig = this.getRepositoryConfig();
       await this.gitManager.initialize(repoConfig);
@@ -124,24 +137,62 @@ class ALMCPServer {
       await this.searchIndexer.initialize();
       this.isInitialized = true;
       
-      this.logger.info('AL MCP Server initialized successfully');
+      // Log indexing status after initialization
+      const status = await this.gitManager.getRepositoryStatus();
+      this.logger.info('AL MCP Server initialized successfully', {
+        branches: status.branches.length,
+        objects: status.totalObjects || 0
+      });
     } catch (error) {
       this.logger.error('Failed to initialize AL MCP Server', { error });
-      throw new McpError(ErrorCode.InternalError, `Initialization failed: ${error}`);
+      // Don't throw here - just log the error and set initialization flag
+      this.isInitialized = false;
+    }
+  }
+
+  private async ensureInitialized(): Promise<void> {
+    if (this.isInitialized) return;
+
+    // If not initialized, wait a bit and check again or reinitialize
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    if (!this.isInitialized) {
+      await this.initializeAsync();
+      if (!this.isInitialized) {
+        throw new McpError(ErrorCode.InternalError, 'Server not properly initialized. Please check logs.');
+      }
     }
   }
 
   private getRepositoryConfig(): RepositoryConfig {
-    return {
+    this.logger.info('Starting getRepositoryConfig()');
+    
+    const config = {
       type: (process.env.REPO_TYPE as any) || 'bc-history-sandbox',
       url: process.env.REPO_URL || 'https://github.com/StefanMaron/MSDyn365BC.Sandbox.Code.History.git',
       path: process.env.REPO_PATH,
-      defaultBranches: (process.env.DEFAULT_BRANCHES || 'w1-26,w1-24').split(','),
+      defaultBranch: process.env.DEFAULT_BRANCH,
+      cloneDepth: parseInt(process.env.CLONE_DEPTH || '1'),
       maxBranches: parseInt(process.env.MAX_BRANCHES || '10'),
       autoCleanup: process.env.AUTO_CLEANUP === 'true',
       cleanupInterval: process.env.CLEANUP_INTERVAL || '24h',
       authTokenFile: process.env.AUTH_TOKEN_FILE,
     };
+    
+    this.logger.info('Repository configuration loaded', {
+      type: config.type,
+      url: config.url,
+      defaultBranch: config.defaultBranch,
+      defaultBranchType: typeof config.defaultBranch,
+      defaultBranchLength: config.defaultBranch?.length,
+      environmentDefaultBranch: process.env.DEFAULT_BRANCH,
+      cloneDepth: config.cloneDepth,
+      autoCleanup: config.autoCleanup
+    });
+    
+    this.logger.info('Completed getRepositoryConfig()');
+    
+    return config;
   }
 
   private getWorkspaceConfig(): WorkspaceConfig {
@@ -225,7 +276,7 @@ class ALMCPServer {
       type: args.repo_type || 'microsoft-bc',
       url: args.repo_url,
       path: args.repo_path,
-      defaultBranches: args.default_branches || ['w1-26', 'w1-24'],
+      defaultBranch: args.DEFAULT_BRANCH,
     };
 
     await this.gitManager.setRepository(repoConfig);
@@ -289,6 +340,13 @@ class ALMCPServer {
     include_dependencies?: boolean;
     include_events?: boolean;
     include_permissions?: boolean;
+    include_summary_only?: boolean;
+    include_procedures?: boolean;
+    include_variables?: boolean;
+    include_triggers?: boolean;
+    max_procedures?: number;
+    max_variables?: number;
+    include_source_code?: boolean;
   }): Promise<any> {
     const { object_type, object_name, object_id, branch, ...options } = args;
     
@@ -300,7 +358,12 @@ class ALMCPServer {
       throw new McpError(ErrorCode.InvalidParams, 'Either object_name or object_id is required');
     }
 
-    const objectInfo = await this.alAnalyzer.getObject(object_type, object_name || object_id, branch, options);
+    const identifier = object_name || object_id;
+    if (identifier === undefined) {
+      throw new McpError(ErrorCode.InvalidParams, 'Invalid identifier');
+    }
+
+    const objectInfo = await this.alAnalyzer.getObject(object_type, identifier, branch, options);
     return objectInfo;
   }
 
@@ -414,7 +477,7 @@ class ALMCPServer {
               enum: ['bc-history-sandbox', 'bc-fork', 'al-extension', 'local-development'],
               description: 'Repository type for optimized handling'
             },
-            default_branches: {
+            DEFAULT_BRANCH: {
               type: 'array',
               items: { type: 'string' },
               description: 'Branches to initially track'
@@ -533,6 +596,39 @@ class ALMCPServer {
               type: 'boolean',
               default: false,
               description: 'Include required permissions for this object'
+            },
+            include_summary_only: {
+              type: 'boolean',
+              default: false,
+              description: 'Return only basic object information to reduce response size'
+            },
+            include_procedures: {
+              type: 'boolean',
+              default: true,
+              description: 'Include procedures (for codeunits). Set to false to reduce large responses'
+            },
+            include_variables: {
+              type: 'boolean',
+              default: true,
+              description: 'Include variables (for codeunits). Set to false to reduce large responses'
+            },
+            include_triggers: {
+              type: 'boolean',
+              default: true,
+              description: 'Include triggers. Set to false to reduce large responses'
+            },
+            max_procedures: {
+              type: 'number',
+              description: 'Maximum number of procedures to include (helpful for very large codeunits)'
+            },
+            max_variables: {
+              type: 'number',
+              description: 'Maximum number of variables to include (helpful for very large codeunits)'
+            },
+            include_source_code: {
+              type: 'boolean',
+              default: false,
+              description: 'Include the actual AL source code content. WARNING: This can significantly increase response size'
             }
           },
           required: ['object_type']
@@ -600,7 +696,7 @@ class ALMCPServer {
 }
 
 // Start the server if this file is run directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (require.main === module) {
   const server = new ALMCPServer();
   server.run().catch((error) => {
     console.error('Failed to start AL MCP Server:', error);

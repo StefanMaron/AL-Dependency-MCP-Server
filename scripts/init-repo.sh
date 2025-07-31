@@ -15,7 +15,7 @@ NC='\033[0m' # No Color
 # Default values
 REPO_TYPE="${REPO_TYPE:-bc-history-sandbox}"
 REPO_URL="${REPO_URL:-https://github.com/StefanMaron/MSDyn365BC.Sandbox.Code.History.git}"
-DEFAULT_BRANCHES="${DEFAULT_BRANCHES:-w1-26,w1-24}"
+DEFAULT_BRANCH="${DEFAULT_BRANCH}"
 REPO_CACHE_PATH="${REPO_CACHE_PATH:-/app/repo-cache}"
 MAX_BRANCHES="${MAX_BRANCHES:-10}"
 AUTO_CLEANUP="${AUTO_CLEANUP:-true}"
@@ -120,9 +120,9 @@ init_bc_history_sandbox_repo() {
         }
     fi
     
-    # Add default branches
-    IFS=',' read -ra BRANCHES <<< "$DEFAULT_BRANCHES"
-    for branch in "${BRANCHES[@]}"; do
+    # Add default branch
+    if [ -n "$DEFAULT_BRANCH" ]; then
+        branch="$DEFAULT_BRANCH"
         branch=$(echo "$branch" | xargs) # trim whitespace
         
         log "Setting up branch: $branch"
@@ -131,24 +131,18 @@ init_bc_history_sandbox_repo() {
             # Create or update local branch
             git branch -f "$branch" "origin/$branch" || {
                 log_warning "Failed to create branch $branch"
-                continue
+                return
             }
             
             log_success "Branch $branch ready"
+            
+            # Checkout the branch
+            git checkout "$branch"
+            log_success "Checked out branch: $branch"
         else
             log_warning "Branch $branch not found in remote repository"
         fi
-    done
-    
-    # Checkout the first available branch
-    for branch in "${BRANCHES[@]}"; do
-        branch=$(echo "$branch" | xargs)
-        if git show-ref --verify --quiet "refs/heads/$branch"; then
-            git checkout "$branch"
-            log_success "Checked out branch: $branch"
-            break
-        fi
-    done
+    fi
 }
 
 init_bc_fork_repo() {
@@ -354,7 +348,7 @@ print_summary() {
     echo "  Repository Type: $REPO_TYPE"
     echo "  Repository URL: ${REPO_URL:-'N/A'}"
     echo "  Cache Path: $REPO_CACHE_PATH"
-    echo "  Default Branches: $DEFAULT_BRANCHES"
+    echo "  Default Branch: $DEFAULT_BRANCH"
     echo "  Max Branches: $MAX_BRANCHES"
     echo "  Auto Cleanup: $AUTO_CLEANUP"
     echo

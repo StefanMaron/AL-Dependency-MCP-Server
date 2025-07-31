@@ -21,7 +21,7 @@ services:
       - NODE_ENV=production
       - REPO_TYPE=bc-history-sandbox
       - REPO_URL=https://github.com/StefanMaron/MSDyn365BC.Sandbox.Code.History.git
-      - DEFAULT_BRANCHES=w1-26,w1-24
+      - DEFAULT_BRANCH=w1-26,w1-24
       - AUTO_CLEANUP=true
       - CLEANUP_INTERVAL=24h
       - MAX_BRANCHES=10
@@ -59,7 +59,7 @@ services:
       - NODE_ENV=production
       - REPO_TYPE=bc-fork
       - REPO_URL=https://github.com/acme-corp/BCApps.git
-      - DEFAULT_BRANCHES=main,enterprise-v2024
+      - DEFAULT_BRANCH=main,enterprise-v2024
       - AUTH_TOKEN_FILE=/run/secrets/git_token
     secrets:
       - git_token

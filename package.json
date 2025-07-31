@@ -11,7 +11,13 @@
     "lint": "eslint src/**/*.ts",
     "clean": "rm -rf dist"
   },
-  "keywords": ["mcp", "al", "business-central", "dynamics365", "microsoft"],
+  "keywords": [
+    "mcp",
+    "al",
+    "business-central",
+    "dynamics365",
+    "microsoft"
+  ],
   "author": "AL Development Community",
   "license": "MIT",
   "engines": {
@@ -19,16 +25,16 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.5.0",
-    "simple-git": "^3.24.0",
+    "async-mutex": "^0.4.1",
     "glob": "^10.3.10",
     "minimatch": "^9.0.3",
-    "winston": "^3.11.0",
     "node-cron": "^3.0.3",
-    "async-mutex": "^0.4.1"
+    "simple-git": "^3.28.0",
+    "winston": "^3.11.0"
   },
   "devDependencies": {
-    "@types/node": "^20.10.0",
     "@types/jest": "^29.5.8",
+    "@types/node": "^20.10.0",
     "@typescript-eslint/eslint-plugin": "^6.13.0",
     "@typescript-eslint/parser": "^6.13.0",
     "eslint": "^8.54.0",

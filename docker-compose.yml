@@ -3,23 +3,22 @@ version: '3.8'
 services:
   al-mcp-server:
     build: .
-    ports:
-      - "3000:3000"
     volumes:
-      - repo-cache:/app/repo-cache
-      - index-cache:/app/index-cache
+      - repo-cache:/app/.cache/repo-cache
+      - index-cache:/app/.cache/index-cache
     environment:
       - NODE_ENV=production
       - REPO_TYPE=bc-history-sandbox
       - REPO_URL=https://github.com/StefanMaron/MSDyn365BC.Sandbox.Code.History.git
-      - DEFAULT_BRANCHES=w1-26,w1-24
+      - DEFAULT_BRANCH=w1-26
+      - CLONE_DEPTH=1
       - AUTO_CLEANUP=true
       - CLEANUP_INTERVAL=24h
       - MAX_BRANCHES=10
       - LOG_LEVEL=info
-    restart: unless-stopped
+    restart: "no"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD", "pgrep", "-f", "node dist/server.js"]
       interval: 30s
       timeout: 10s
       retries: 3

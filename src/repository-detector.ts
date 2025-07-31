@@ -4,10 +4,9 @@ import { Logger } from 'winston';
 import { 
   RepositoryType, 
   WorkspaceConfig, 
-  ExtensionInfo,
   ExtensionDependency 
-} from './types/al-types.js';
-import { ALParser } from './al-parser.js';
+} from './types/al-types';
+import { ALParser } from './al-parser';
 
 export interface DetectionResult {
   type: RepositoryType;

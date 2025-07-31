@@ -1,4 +1,7 @@
-import { ALObjectType, ObjectReference } from './al-types.js';
+import { ALObjectType, ObjectReference } from './al-types';
+
+// Re-export for convenience
+export { ObjectReference };
 
 export interface ALObject {
   type: ALObjectType;
@@ -219,6 +222,18 @@ export interface Permission {
 }
 
 export type PermissionValue = 'Yes' | 'No' | 'Indirect';
+
+export interface PermissionInfo {
+  objectType: ALObjectType;
+  objectId: number | string;
+  permissions: {
+    read?: PermissionValue;
+    insert?: PermissionValue;
+    modify?: PermissionValue;
+    delete?: PermissionValue;
+    execute?: PermissionValue;
+  };
+}
 
 export interface TablePermissions {
   read?: PermissionValue;

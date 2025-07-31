@@ -400,6 +400,79 @@ for (const searchQuery of searchQueries) {
 }
 ```
 
+### Handling Large Objects
+
+The AL MCP server includes several options to handle large objects that might exceed token limits:
+
+```typescript
+// Problem: Large codeunit like Sales-Post (ID 80) exceeds token limits
+// ❌ This might fail with "response exceeds maximum allowed tokens"
+try {
+  const largeCodeunit = await mcp.call("al_get_object", {
+    object_type: "codeunit",
+    object_id: 80,
+    branch: "w1-26"
+  });
+} catch (error) {
+  console.log("Response too large:", error.message);
+}
+
+// ✅ Solution 1: Get summary only
+const summary = await mcp.call("al_get_object", {
+  object_type: "codeunit",
+  object_id: 80,
+  branch: "w1-26",
+  include_summary_only: true
+});
+console.log(`${summary.name}: ${summary.caption}`);
+
+// ✅ Solution 2: Limit procedures and exclude variables
+const limitedCodeunit = await mcp.call("al_get_object", {
+  object_type: "codeunit",
+  object_id: 80,
+  branch: "w1-26",
+  max_procedures: 10,
+  include_variables: false,
+  include_triggers: false
+});
+console.log(`First 10 procedures of ${limitedCodeunit.name}:`);
+limitedCodeunit.procedures.forEach(proc => {
+  console.log(`- ${proc.name}(${proc.parameters.map(p => p.name).join(', ')})`);
+});
+
+// ✅ Solution 3: Get just structure without source code (default)
+const structureOnly = await mcp.call("al_get_object", {
+  object_type: "codeunit",
+  object_id: 80,
+  branch: "w1-26",
+  include_procedures: true,
+  include_source_code: false  // This is the default
+});
+
+// ✅ Solution 4: Get source code only for small objects
+const withSourceCode = await mcp.call("al_get_object", {
+  object_type: "codeunit",
+  object_name: "Small Helper Codeunit",
+  include_source_code: true,
+  include_procedures: false,  // Structure not needed if you have source
+  include_variables: false
+});
+console.log("Source code length:", withSourceCode.sourceCode?.length);
+
+// ✅ Solution 5: Check size warnings
+const result = await mcp.call("al_get_object", {
+  object_type: "codeunit",  
+  object_id: 80,
+  max_procedures: 5
+});
+
+if (result.metadata.sizeWarning) {
+  console.log("Size warning:", result.metadata.sizeWarning.message);
+  console.log("Suggestions:", result.metadata.sizeWarning.suggestions);
+}
+console.log(`Estimated tokens: ${result.metadata.estimatedTokens}`);
+```
+
 ## Integration Examples
 
 ### GitHub Actions Workflow
@@ -422,7 +495,7 @@ jobs:
           - 3000:3000
         env:
           REPO_TYPE: bc-history-sandbox
-          DEFAULT_BRANCHES: w1-26,w1-24
+          DEFAULT_BRANCH: w1-26,w1-24
           
     steps:
       - uses: actions/checkout@v3

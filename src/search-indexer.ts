@@ -2,14 +2,14 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { Logger } from 'winston';
 import { Mutex } from 'async-mutex';
-import { ALParser } from './al-parser.js';
-import { GitManager } from './git-manager.js';
+import { ALParser } from './al-parser';
+import { GitManager } from './git-manager';
 import {
   ALObject,
   ObjectReference,
   SearchResult
-} from './types/al-objects.js';
-import { ALObjectType, SearchFilters } from './types/al-types.js';
+} from './types/al-objects';
+import { ALObjectType, SearchFilters } from './types/al-types';
 
 export interface SearchIndex {
   objects: IndexedObject[];
@@ -59,17 +59,19 @@ export class SearchIndexer {
   private parser: ALParser;
   private gitManager: GitManager;
   private indexPath: string;
+  private repoPath: string;
   private index: Map<string, SearchIndex> = new Map();
   private mutex = new Mutex();
   private performanceMetrics: PerformanceMetrics;
   private searchCache: Map<string, SearchResult> = new Map();
   private readonly maxCacheSize = 1000;
 
-  constructor(logger: Logger) {
+  constructor(logger: Logger, gitManager?: GitManager) {
     this.logger = logger;
     this.parser = new ALParser(logger);
-    this.gitManager = new GitManager(logger);
-    this.indexPath = process.env.INDEX_CACHE_PATH || '/app/index-cache';
+    this.gitManager = gitManager || new GitManager(logger);
+    this.indexPath = process.env.INDEX_CACHE_PATH || path.join(process.cwd(), '.cache', 'index-cache');
+    this.repoPath = process.env.REPO_CACHE_PATH || path.join(process.cwd(), '.cache', 'repo-cache');
     this.performanceMetrics = {
       indexSize: 0,
       avgSearchTime: 0,
@@ -85,10 +87,36 @@ export class SearchIndexer {
     await this.ensureIndexPath();
     await this.loadExistingIndices();
     
+    // Index any branches that are available but not indexed
+    await this.indexAvailableBranches();
+    
     this.logger.info('Search Indexer initialized', {
       indexedBranches: this.index.size,
       totalObjects: Array.from(this.index.values()).reduce((sum, idx) => sum + idx.metadata.totalObjects, 0)
     });
+  }
+
+  private async indexAvailableBranches(): Promise<void> {
+    try {
+      // Get available branches from git manager
+      const availableBranches = await this.gitManager.listBranches();
+      
+      for (const branchInfo of availableBranches) {
+        const branchName = branchInfo.name;
+        
+        // Check if branch needs indexing
+        if (!this.index.has(branchName) || !this.isIndexValid(this.index.get(branchName)!)) {
+          this.logger.info(`Auto-indexing branch: ${branchName}`);
+          try {
+            await this.indexBranch(branchName);
+          } catch (error) {
+            this.logger.warn(`Failed to auto-index branch: ${branchName}`, { error });
+          }
+        }
+      }
+    } catch (error) {
+      this.logger.warn('Failed to auto-index available branches', { error });
+    }
   }
 
   private async ensureIndexPath(): Promise<void> {
@@ -188,14 +216,20 @@ export class SearchIndexer {
         
         const indexedObjects: IndexedObject[] = [];
         
+        this.logger.info(`Found ${alFiles.length} AL files to index`);
+        
         for (const filePath of alFiles) {
           try {
-            const fullPath = path.join('/app/repo-cache', filePath);
+            const fullPath = path.join(this.repoPath, filePath);
+            this.logger.debug(`Parsing AL file: ${filePath} -> ${fullPath}`);
+            
             const parseResult = await this.parser.parseFile(fullPath, branchName, {
               includeObsolete: true,
               includeDetails: false,
               validateSyntax: false
             });
+
+            this.logger.debug(`Parsed ${parseResult.objects.length} objects from ${filePath}`);
 
             for (const obj of parseResult.objects) {
               const indexedObj = await this.createIndexedObject(obj, filePath);
@@ -254,7 +288,7 @@ export class SearchIndexer {
     let lastModified = new Date();
     
     try {
-      const fullPath = path.join('/app/repo-cache', filePath);
+      const fullPath = path.join(this.repoPath, filePath);
       const stats = await fs.stat(fullPath);
       size = stats.size;
       lastModified = stats.mtime;
@@ -556,7 +590,9 @@ export class SearchIndexer {
     // Implement LRU cache
     if (this.searchCache.size >= this.maxCacheSize) {
       const firstKey = this.searchCache.keys().next().value;
-      this.searchCache.delete(firstKey);
+      if (firstKey) {
+        this.searchCache.delete(firstKey);
+      }
     }
     
     this.searchCache.set(key, result);

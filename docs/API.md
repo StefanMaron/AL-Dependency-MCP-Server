@@ -63,14 +63,14 @@ Initialize or switch to a different AL repository.
 - `repo_url` (string, optional): Git repository URL
 - `repo_path` (string, optional): Local repository path (alternative to repo_url)
 - `repo_type` (string, optional): Repository type ("bc-history-sandbox", "bc-fork", "al-extension", "local-development")
-- `default_branches` (string[], optional): Branches to initially track
+- `DEFAULT_BRANCH` (string[], optional): Branches to initially track
 
 **Example:**
 ```typescript
 await mcp.call("al_set_repository", {
   repo_url: "https://github.com/your-org/CustomBC.git",
   repo_type: "bc-fork",
-  default_branches: ["main", "develop"]
+  DEFAULT_BRANCH: ["main", "develop"]
 });
 ```
 
@@ -175,13 +175,47 @@ Get detailed information about a specific AL object.
 - `include_events` (boolean, optional, default: false): Include events
 - `include_permissions` (boolean, optional, default: false): Include permissions
 
-**Example:**
+**Large Object Handling Parameters:**
+- `include_summary_only` (boolean, default: false): Return only basic object information to reduce response size
+- `include_procedures` (boolean, default: true): Include procedures (for codeunits). Set to false to reduce large responses
+- `include_variables` (boolean, default: true): Include variables (for codeunits). Set to false to reduce large responses  
+- `include_triggers` (boolean, default: true): Include triggers. Set to false to reduce large responses
+- `max_procedures` (number): Maximum number of procedures to include (helpful for very large codeunits)
+- `max_variables` (number): Maximum number of variables to include (helpful for very large codeunits)
+- `include_source_code` (boolean, default: false): Include the actual AL source code content. WARNING: This can significantly increase response size
+
+**Examples:**
 ```typescript
+// Full object details
 await mcp.call("al_get_object", {
   object_type: "codeunit",
   object_name: "Approval Management",
   include_dependencies: true,
   include_events: true
+});
+
+// Summary only for large objects
+await mcp.call("al_get_object", {
+  object_type: "codeunit", 
+  object_id: 80,
+  include_summary_only: true
+});
+
+// Limited procedures for large codeunits
+await mcp.call("al_get_object", {
+  object_type: "codeunit",
+  object_id: 80, 
+  max_procedures: 10,
+  include_variables: false
+});
+
+// Get source code for specific analysis
+await mcp.call("al_get_object", {
+  object_type: "codeunit",
+  object_name: "Small Helper Codeunit",
+  include_source_code: true,
+  include_procedures: false,
+  include_variables: false
 });
 ```
 

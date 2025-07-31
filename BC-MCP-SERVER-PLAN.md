@@ -93,7 +93,7 @@ services:
       - NODE_ENV=production
       - REPO_TYPE=microsoft-bc
       - REPO_URL=https://github.com/microsoft/BCApps.git
-      - DEFAULT_BRANCHES=w1-26,w1-24
+      - DEFAULT_BRANCH=w1-26,w1-24
       - AUTO_CLEANUP=true
       - CLEANUP_INTERVAL=24h
       - MAX_BRANCHES=10
@@ -143,7 +143,7 @@ services:
       - NODE_ENV=production
       - REPO_TYPE=bc-fork
       - REPO_URL=https://github.com/acme-corp/BCApps.git
-      - DEFAULT_BRANCHES=main,enterprise-v2024
+      - DEFAULT_BRANCH=main,enterprise-v2024
       - AUTH_TOKEN_FILE=/run/secrets/git_token
     secrets:
       - git_token
@@ -232,7 +232,7 @@ secrets:
         "enum": ["microsoft-bc", "bc-fork", "al-extension", "local-development"],
         "description": "Repository type for optimized handling"
       },
-      "default_branches": {
+      "DEFAULT_BRANCH": {
         "type": "array",
         "items": {"type": "string"},
         "description": "Branches to initially track"
@@ -570,7 +570,7 @@ secrets:
 docker run -p 3000:3000 \
   -e REPO_URL=https://github.com/microsoft/BCApps.git \
   -e REPO_TYPE=microsoft-bc \
-  -e DEFAULT_BRANCHES=w1-26,w1-24 \
+  -e DEFAULT_BRANCH=w1-26,w1-24 \
   al-mcp-server:latest
 ```
 
@@ -592,7 +592,7 @@ docker run -p 3000:3000 \
 docker run -p 3000:3000 \
   -e REPO_URL=https://github.com/acme-corp/BCApps.git \
   -e REPO_TYPE=bc-fork \
-  -e DEFAULT_BRANCHES=main,enterprise-v2024 \
+  -e DEFAULT_BRANCH=main,enterprise-v2024 \
   al-mcp-server:latest
 ```
 

@@ -21,8 +21,8 @@ import {
   ALVariable,
   ALEvent,
   ObjectReference
-} from './types/al-objects.js';
-import { ALObjectType } from './types/al-types.js';
+} from './types/al-objects';
+import { ALObjectType } from './types/al-types';
 
 export interface ParseResult {
   objects: ALObject[];
@@ -45,12 +45,12 @@ export interface ParseOptions {
 
 export class ALParser {
   private logger: Logger;
-  private objectPatterns: Map<ALObjectType, RegExp>;
-  private fieldPattern: RegExp;
-  private procedurePattern: RegExp;
-  private triggerPattern: RegExp;
-  private variablePattern: RegExp;
-  private eventPattern: RegExp;
+  private objectPatterns!: Map<ALObjectType, RegExp>;
+  private fieldPattern!: RegExp;
+  private procedurePattern!: RegExp;
+  private triggerPattern!: RegExp;
+  private variablePattern!: RegExp;
+  private eventPattern!: RegExp;
 
   constructor(logger: Logger) {
     this.logger = logger;
@@ -60,22 +60,22 @@ export class ALParser {
   private initializePatterns(): void {
     // AL object declaration patterns
     this.objectPatterns = new Map([
-      ['table', /^\s*table\s+(\d+)\s+(["\w\s]+)\s*$/i],
-      ['tableextension', /^\s*tableextension\s+(\d+)\s+(["\w\s]+)\s+extends\s+(["\w\s]+)\s*$/i],
-      ['page', /^\s*page\s+(\d+)\s+(["\w\s]+)\s*$/i],
-      ['pageextension', /^\s*pageextension\s+(\d+)\s+(["\w\s]+)\s+extends\s+(["\w\s]+)\s*$/i],
-      ['codeunit', /^\s*codeunit\s+(\d+)\s+(["\w\s]+)\s*$/i],
-      ['report', /^\s*report\s+(\d+)\s+(["\w\s]+)\s*$/i],
-      ['query', /^\s*query\s+(\d+)\s+(["\w\s]+)\s*$/i],
-      ['enum', /^\s*enum\s+(\d+)\s+(["\w\s]+)\s*$/i],
-      ['enumextension', /^\s*enumextension\s+(\d+)\s+(["\w\s]+)\s+extends\s+(["\w\s]+)\s*$/i],
-      ['interface', /^\s*interface\s+(["\w\s]+)\s*$/i],
-      ['permissionset', /^\s*permissionset\s+(\d+)\s+(["\w\s]+)\s*$/i],
-      ['xmlport', /^\s*xmlport\s+(\d+)\s+(["\w\s]+)\s*$/i],
-      ['controladdin', /^\s*controladdin\s+(["\w\s]+)\s*$/i],
-      ['profile', /^\s*profile\s+(["\w\s]+)\s*$/i],
-      ['pagecustomization', /^\s*pagecustomization\s+(["\w\s]+)\s+customizes\s+(["\w\s]+)\s*$/i],
-      ['reportextension', /^\s*reportextension\s+(\d+)\s+(["\w\s]+)\s+extends\s+(["\w\s]+)\s*$/i]
+      ['table', /^\s*table\s+(\d+)\s+(["\w\s\-\.]+)\s*$/i],
+      ['tableextension', /^\s*tableextension\s+(\d+)\s+(["\w\s\-\.]+)\s+extends\s+(["\w\s\-\.]+)\s*$/i],
+      ['page', /^\s*page\s+(\d+)\s+(["\w\s\-\.]+)\s*$/i],
+      ['pageextension', /^\s*pageextension\s+(\d+)\s+(["\w\s\-\.]+)\s+extends\s+(["\w\s\-\.]+)\s*$/i],
+      ['codeunit', /^\s*codeunit\s+(\d+)\s+(["\w\s\-\.]+)\s*$/i],
+      ['report', /^\s*report\s+(\d+)\s+(["\w\s\-\.]+)\s*$/i],
+      ['query', /^\s*query\s+(\d+)\s+(["\w\s\-\.]+)\s*$/i],
+      ['enum', /^\s*enum\s+(\d+)\s+(["\w\s\-\.]+)\s*$/i],
+      ['enumextension', /^\s*enumextension\s+(\d+)\s+(["\w\s\-\.]+)\s+extends\s+(["\w\s\-\.]+)\s*$/i],
+      ['interface', /^\s*interface\s+(["\w\s\-\.]+)\s*$/i],
+      ['permissionset', /^\s*permissionset\s+(\d+)\s+(["\w\s\-\.]+)\s*$/i],
+      ['xmlport', /^\s*xmlport\s+(\d+)\s+(["\w\s\-\.]+)\s*$/i],
+      ['controladdin', /^\s*controladdin\s+(["\w\s\-\.]+)\s*$/i],
+      ['profile', /^\s*profile\s+(["\w\s\-\.]+)\s*$/i],
+      ['pagecustomization', /^\s*pagecustomization\s+(["\w\s\-\.]+)\s+customizes\s+(["\w\s\-\.]+)\s*$/i],
+      ['reportextension', /^\s*reportextension\s+(\d+)\s+(["\w\s\-\.]+)\s+extends\s+(["\w\s\-\.]+)\s*$/i]
     ]);
 
     // Field pattern
@@ -572,7 +572,7 @@ export class ALParser {
     return {
       name: match[1],
       lineNumber,
-      parameters: match[2] ? this.parseParameters(match[2]) : []
+      parameters: match[2] ? this.parseParameters(match[2]).map(p => p.name) : []
     };
   }
 
@@ -660,14 +660,14 @@ export class ALParser {
     const dependencies: ObjectReference[] = [];
 
     // Add extends relationships
-    if ('extends' in obj && obj.extends) {
-      dependencies.push(obj.extends);
+    if ('extends' in obj && obj.extends && typeof obj.extends === 'object' && 'type' in obj.extends && 'name' in obj.extends) {
+      dependencies.push(obj.extends as ObjectReference);
     }
 
     // Add table relations from fields
-    if ('fields' in obj && obj.fields) {
+    if ('fields' in obj && obj.fields && Array.isArray(obj.fields)) {
       for (const field of obj.fields) {
-        if (field.tableRelation) {
+        if (field && field.tableRelation) {
           // Extract table name from table relation
           const tableName = field.tableRelation.split('.')[0].replace(/['"]/g, '');
           dependencies.push({
@@ -681,8 +681,8 @@ export class ALParser {
     }
 
     // Add source table references
-    if ('sourceTable' in obj && obj.sourceTable) {
-      dependencies.push(obj.sourceTable);
+    if ('sourceTable' in obj && obj.sourceTable && typeof obj.sourceTable === 'object' && 'type' in obj.sourceTable && 'name' in obj.sourceTable) {
+      dependencies.push(obj.sourceTable as ObjectReference);
     }
 
     return dependencies;

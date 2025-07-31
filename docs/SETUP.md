@@ -1,65 +1,458 @@
 # AL MCP Server Setup Guide
 
-This guide provides comprehensive setup instructions for the AL MCP Server for browsing Business Central code dependencies.
+## Overview
 
-## Table of Contents
-
-- [Prerequisites](#prerequisites)
-- [Quick Start](#quick-start)
-- [Environment-Specific Setup](#environment-specific-setup)
-- [Configuration](#configuration)
-- [Integration](#integration)
-- [Troubleshooting](#troubleshooting)
+The AL MCP Server provides Model Context Protocol (MCP) integration for AI assistants to browse and analyze Microsoft Dynamics 365 Business Central source code. This guide covers integration with Claude Desktop and GitHub Copilot for VS Code.
 
 ## Prerequisites
 
-### System Requirements
-
-- **Docker**: Version 20.10 or later
-- **Docker Compose**: Version 2.0 or later
-- **Memory**: Minimum 2GB RAM, recommended 4GB+
-- **Storage**: Minimum 5GB free space for repository caching
-- **Network**: Internet access for repository cloning
-
-### Optional Requirements
-
-- **Git**: For local development and manual repository operations
-- **Node.js**: Version 20+ if running without Docker
-- **VS Code**: For AL development integration
+- Docker and Docker Compose installed
+- Git installed
+- One of the following AI assistants:
+  - Claude Desktop
+  - GitHub Copilot for VS Code (with MCP support)
 
 ## Quick Start
 
-### 1. Default Setup (BC History Sandbox)
-
-The simplest way to get started with Stefan Maron's managed BC repository:
+### 1. Build the Docker Image
 
 ```bash
-# Clone the AL MCP Server
-git clone https://github.com/username/al-mcp-server.git
-cd al-mcp-server
-
-# Start with default configuration
-docker-compose up -d
-
-# Check status
-docker-compose logs -f
+cd /path/to/AlDependencyMCP
+docker build -t aldependencymcp-al-mcp-server .
 ```
 
-This will:
-- Pull Stefan Maron's BC History Sandbox repository
-- Index the w1-26 and w1-24 branches
-- Start the MCP server on port 3000
-- Enable automatic cleanup
-
-### 2. Verify Installation
+### 2. Test the Server
 
 ```bash
-# Check if the server is running
-curl http://localhost:3000/health
-
-# Test MCP functionality (if you have mcp-client installed)
-mcp call al_repo_status '{"detailed": true}'
+# Test that the server starts correctly
+docker run --rm -i --user alserver aldependencymcp-al-mcp-server node dist/server.js
 ```
+
+## Claude Desktop Integration
+
+### Method 1: Direct Docker Image (Recommended)
+
+This method uses the pre-built Docker image with built-in environment variables:
+
+```bash
+claude mcp add al-mcp-server -s user -- docker run --rm -i --user alserver aldependencymcp-al-mcp-server node dist/server.js
+```
+
+#### With Custom Configuration:
+
+```bash
+claude mcp add al-mcp-server -s user -- docker run --rm -i --user alserver \
+  -e DEFAULT_BRANCH=w1-25 \
+  -e CLONE_DEPTH=5 \
+  -e MAX_BRANCHES=15 \
+  -e LOG_LEVEL=debug \
+  aldependencymcp-al-mcp-server node dist/server.js
+```
+
+### Method 2: Docker Compose
+
+```bash
+claude mcp add al-mcp-server -s user -- docker-compose -f /path/to/AlDependencyMCP/docker-compose.yml run --rm al-mcp-server
+```
+
+### Method 3: Environment File
+
+1. **Create environment file:**
+```bash
+cat > /path/to/AlDependencyMCP/mcp.env << EOF
+NODE_ENV=production
+REPO_TYPE=bc-history-sandbox
+REPO_URL=https://github.com/StefanMaron/MSDyn365BC.Sandbox.Code.History.git
+DEFAULT_BRANCH=w1-26
+CLONE_DEPTH=1
+AUTO_CLEANUP=true
+CLEANUP_INTERVAL=24h
+MAX_BRANCHES=10
+LOG_LEVEL=info
+EOF
+```
+
+2. **Add to Claude:**
+```bash
+claude mcp add al-mcp-server -s user -- docker run --rm -i --user alserver --env-file /path/to/AlDependencyMCP/mcp.env aldependencymcp-al-mcp-server node dist/server.js
+```
+
+## GitHub Copilot for VS Code Integration
+
+### Method 1: Direct Docker Image
+
+Add to your VS Code `settings.json`:
+
+```json
+{
+  "mcp.servers": {
+    "al-mcp-server": {
+      "command": "docker",
+      "args": [
+        "run", "--rm", "-i", "--user", "alserver",
+        "aldependencymcp-al-mcp-server", "node", "dist/server.js"
+      ],
+      "env": {
+        "DEFAULT_BRANCH": "w1-26",
+        "CLONE_DEPTH": "1",
+        "MAX_BRANCHES": "10",
+        "LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+### Method 2: Docker Compose
+
+```json
+{
+  "mcp.servers": {
+    "al-mcp-server": {
+      "command": "docker-compose",
+      "args": [
+        "-f", "/path/to/AlDependencyMCP/docker-compose.yml",
+        "run", "--rm", "al-mcp-server"
+      ],
+      "cwd": "/path/to/AlDependencyMCP"
+    }
+  }
+}
+```
+
+### Method 3: Local Node.js Installation
+
+For development or when Docker is not available:
+
+1. **Install and build:**
+```bash
+cd /path/to/AlDependencyMCP
+npm install
+npm run build
+```
+
+2. **Add to VS Code settings.json:**
+```json
+{
+  "mcp.servers": {
+    "al-mcp-server": {
+      "command": "node",
+      "args": ["dist/server.js"],
+      "cwd": "/path/to/AlDependencyMCP",
+      "env": {
+        "NODE_ENV": "production",
+        "REPO_TYPE": "bc-history-sandbox",
+        "REPO_URL": "https://github.com/StefanMaron/MSDyn365BC.Sandbox.Code.History.git",
+        "DEFAULT_BRANCH": "w1-26",
+        "CLONE_DEPTH": "1",
+        "AUTO_CLEANUP": "true",
+        "CLEANUP_INTERVAL": "24h",
+        "MAX_BRANCHES": "10",
+        "LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+## Configuration Options
+
+### Environment Variables
+
+| Variable | Description | Default | Required |
+|----------|-------------|---------|----------|
+| `NODE_ENV` | Node.js environment | `production` | No |
+| `REPO_TYPE` | Repository type | `bc-history-sandbox` | No |
+| `REPO_URL` | Git repository URL | BC Sandbox History | No |
+| `DEFAULT_BRANCH` | Initial branch to load | `w1-26` | No |
+| `CLONE_DEPTH` | Git clone depth | `1` | No |
+| `AUTO_CLEANUP` | Enable automatic cleanup | `true` | No |
+| `CLEANUP_INTERVAL` | Cleanup frequency | `24h` | No |
+| `MAX_BRANCHES` | Maximum branches to cache | `10` | No |
+| `LOG_LEVEL` | Logging verbosity | `info` | No |
+| `REPO_CACHE_PATH` | Local cache directory | `/app/.cache/repo-cache` | No |
+
+### Repository Types
+
+- **`bc-history-sandbox`**: Microsoft BC source code history (default)
+- **`bc-fork`**: Enterprise BC fork repository
+- **`al-extension`**: AL extension repository
+- **`local-development`**: Local AL workspace
+
+### Branch Configuration
+
+The `DEFAULT_BRANCH` can be set to any valid branch name:
+- BC version branches: `w1-26`, `w1-25`, `w1-24`, etc.
+- Standard branches: `main`, `master`, `develop`
+- Custom branches: `feature/my-feature`, `release/v2.0`
+
+### Custom Repository Configuration
+
+#### For Enterprise BC Forks:
+```bash
+claude mcp add al-mcp-server -s user -- docker run --rm -i --user alserver \
+  -e REPO_TYPE=bc-fork \
+  -e REPO_URL=https://github.com/your-company/BCApps.git \
+  -e DEFAULT_BRANCH=main \
+  -e CLONE_DEPTH=5 \
+  aldependencymcp-al-mcp-server node dist/server.js
+```
+
+#### For Local Development:
+```bash
+claude mcp add al-mcp-server -s user -- docker run --rm -i --user alserver \
+  -v /path/to/your/AL/workspace:/workspace:ro \
+  -e REPO_TYPE=local-development \
+  -e WORKSPACE_PATH=/workspace \
+  aldependencymcp-al-mcp-server node dist/server.js
+```
+
+## Troubleshooting
+
+### Common Issues
+
+#### 1. Environment Variables Not Loaded
+
+**Symptoms:**
+- Logs show `"allEnvKeys":[]`
+- Default branch not initialized
+- Server uses only default configuration
+
+**Solution:**
+Ensure you're using one of the documented methods that properly sets environment variables. The built-in Dockerfile now includes default ENV values, so this should work:
+
+```bash
+claude mcp add al-mcp-server -s user -- docker run --rm -i --user alserver aldependencymcp-al-mcp-server node dist/server.js
+```
+
+#### 2. Docker Image Not Found
+
+**Symptoms:**
+- `docker: Error response from daemon: pull access denied`
+- `Unable to find image 'aldependencymcp-al-mcp-server:latest'`
+
+**Solution:**
+```bash
+cd /path/to/AlDependencyMCP
+docker build -t aldependencymcp-al-mcp-server .
+```
+
+#### 3. Permission Issues
+
+**Symptoms:**
+- Permission denied errors in logs
+- Cannot create cache directories
+
+**Solution:**
+Ensure you're using the correct user:
+```bash
+docker run --rm -i --user alserver aldependencymcp-al-mcp-server node dist/server.js
+```
+
+#### 4. Git Repository Access Issues
+
+**Symptoms:**
+- Clone failed errors
+- Network connectivity errors
+
+**Solutions:**
+- Check internet connectivity
+- For private repositories, add authentication:
+```bash
+-e AUTH_TOKEN_FILE=/path/to/token
+-v /path/to/token:/path/to/token:ro
+```
+
+#### 5. Memory/Performance Issues
+
+**Symptoms:**
+- Slow response times
+- Out of memory errors
+
+**Solutions:**
+- Reduce clone depth: `-e CLONE_DEPTH=1`
+- Limit max branches: `-e MAX_BRANCHES=5`
+- Enable cleanup: `-e AUTO_CLEANUP=true`
+
+### Debug Mode
+
+Enable detailed logging for troubleshooting:
+
+```bash
+claude mcp add al-mcp-server -s user -- docker run --rm -i --user alserver \
+  -e LOG_LEVEL=debug \
+  aldependencymcp-al-mcp-server node dist/server.js
+```
+
+### Verifying Installation
+
+1. **Check if server starts:**
+```bash
+docker run --rm aldependencymcp-al-mcp-server node dist/server.js --version
+```
+
+2. **Test environment variables:**
+```bash
+docker run --rm aldependencymcp-al-mcp-server printenv | grep -E "(DEFAULT|BRANCH|REPO)"
+```
+
+3. **Check tools are available:**
+Ask your AI assistant: "What AL MCP tools are available?"
+
+## Performance Optimization
+
+### Recommended Settings
+
+For optimal performance, use these environment variables:
+
+```bash
+# Fast startup, minimal resource usage
+-e CLONE_DEPTH=1
+-e MAX_BRANCHES=10
+-e AUTO_CLEANUP=true
+-e CLEANUP_INTERVAL=24h
+
+# For development/testing
+-e CLONE_DEPTH=5
+-e MAX_BRANCHES=5
+-e AUTO_CLEANUP=true
+-e LOG_LEVEL=debug
+```
+
+### Resource Usage
+
+| Configuration | Memory | Storage | Startup Time |
+|---------------|--------|---------|--------------|
+| Single branch (depth=1) | ~128MB | ~50MB | ~30s |
+| 5 branches (depth=1) | ~256MB | ~250MB | ~2min |
+| 10 branches (depth=5) | ~512MB | ~500MB | ~5min |
+
+## Security Considerations
+
+### Container Security
+
+The Docker container runs as a non-root user (`alserver`) for security:
+- No sudo access
+- Limited system permissions
+- Read-only repository access
+
+### Network Security
+
+- Only outbound HTTPS connections to Git repositories
+- No inbound network access required
+- Rate limiting on Git operations
+
+### Data Privacy
+
+- Repository content is cached locally in container
+- No data sent to external services
+- Containers are ephemeral (`--rm` flag)
+
+## Updates and Maintenance
+
+### Updating the Server
+
+1. **Pull latest code:**
+```bash
+cd /path/to/AlDependencyMCP
+git pull origin main
+```
+
+2. **Rebuild image:**
+```bash
+docker build -t aldependencymcp-al-mcp-server .
+```
+
+3. **Update Claude configuration:**
+```bash
+claude mcp remove al-mcp-server
+claude mcp add al-mcp-server -s user -- docker run --rm -i --user alserver aldependencymcp-al-mcp-server node dist/server.js
+```
+
+### Cleanup
+
+Remove old Docker images and volumes:
+```bash
+docker system prune -f
+docker volume prune -f
+```
+
+## Advanced Configuration
+
+### Multiple Repository Setup
+
+You can configure multiple MCP servers for different repositories:
+
+```bash
+# BC History Sandbox
+claude mcp add al-bc-history -s user -- docker run --rm -i --user alserver \
+  -e REPO_TYPE=bc-history-sandbox \
+  -e DEFAULT_BRANCH=w1-26 \
+  aldependencymcp-al-mcp-server node dist/server.js
+
+# Enterprise Fork
+claude mcp add al-enterprise -s user -- docker run --rm -i --user alserver \
+  -e REPO_TYPE=bc-fork \
+  -e REPO_URL=https://github.com/your-company/BCApps.git \
+  -e DEFAULT_BRANCH=main \
+  aldependencymcp-al-mcp-server node dist/server.js
+```
+
+### Custom Docker Build
+
+For custom configurations, modify the Dockerfile environment variables:
+
+```dockerfile
+# Custom defaults
+ENV DEFAULT_BRANCH=w1-25
+ENV MAX_BRANCHES=15
+ENV CLONE_DEPTH=3
+ENV LOG_LEVEL=debug
+```
+
+Then rebuild:
+```bash
+docker build -t my-custom-al-mcp-server .
+```
+
+## Support and Troubleshooting
+
+### Getting Help
+
+1. **Check logs:** Use `LOG_LEVEL=debug` for detailed output
+2. **GitHub Issues:** Report bugs and feature requests
+3. **Documentation:** Review `/docs` directory for additional guides
+
+### Common Workflows
+
+#### First-time Setup:
+1. Clone repository
+2. Build Docker image
+3. Add to Claude/VS Code
+4. Test with a simple query
+
+#### Daily Usage:
+1. Ask about BC objects: "Find all Sales codeunits"
+2. Explore dependencies: "Show dependencies for Customer table"
+3. Browse versions: "Compare w1-26 vs w1-25 for Item table"
+
+#### Troubleshooting:
+1. Enable debug logging
+2. Check environment variables
+3. Verify Docker image exists
+4. Test network connectivity
+
+For additional examples and use cases, see [EXAMPLES.md](EXAMPLES.md).
+
+4. **Test the MCP server:**
+   ```bash
+   # Test manually first
+   echo '{"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}' | \
+     docker run --rm -i aldependencymcp-al-mcp-server node dist/server.js
+   
+   # Then test with Claude Code
+   claude /mcp
+   ```
 
 ## Environment-Specific Setup
 
@@ -126,7 +519,7 @@ Create a `.env` file for custom configuration:
 # Repository Configuration
 REPO_TYPE=bc-history-sandbox
 REPO_URL=https://github.com/StefanMaron/MSDyn365BC.Sandbox.Code.History.git
-DEFAULT_BRANCHES=w1-26,w1-25,w1-24
+DEFAULT_BRANCH=w1-26,w1-25,w1-24
 
 # Performance Settings
 MAX_BRANCHES=15
@@ -319,7 +712,7 @@ jobs:
           - 3000:3000
         env:
           REPO_TYPE: bc-history-sandbox
-          DEFAULT_BRANCHES: w1-26,w1-24
+          DEFAULT_BRANCH: w1-26,w1-24
           
     steps:
       - uses: actions/checkout@v3
