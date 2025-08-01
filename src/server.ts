@@ -230,6 +230,12 @@ class ALMCPServer {
       case 'al_workspace_overview':
         return await this.getWorkspaceOverview(args);
 
+      // New Enhanced Tools
+      case 'al_browse_code':
+        return await this.browseCode(args);
+      case 'al_find_usages':
+        return await this.findUsages(args);
+
       default:
         throw new McpError(ErrorCode.MethodNotFound, `Unknown tool: ${name}`);
     }
@@ -401,6 +407,213 @@ class ALMCPServer {
 
     const overview = await this.repositoryDetector.getWorkspaceOverview(workspaceConfig);
     return overview;
+  }
+
+  private async browseCode(args: {
+    object_type: ALObjectType;
+    object_name?: string;
+    object_id?: number;
+    branch?: string;
+    context_lines?: number;
+  }): Promise<any> {
+    const { object_type, object_name, object_id, branch, context_lines = 10 } = args;
+    
+    if (!object_type) {
+      throw new McpError(ErrorCode.InvalidParams, 'Object type is required');
+    }
+
+    if (!object_name && !object_id) {
+      throw new McpError(ErrorCode.InvalidParams, 'Either object_name or object_id is required');
+    }
+
+    // Get the object with full source code
+    const object = await this.alAnalyzer.getObject(
+      object_type,
+      object_name || object_id!,
+      branch,
+      {
+        include_source_code: true,
+        include_dependencies: true,
+        include_procedures: true,
+        include_triggers: true,
+        include_variables: true
+      }
+    );
+
+    // Build navigation structure
+    const navigation: any = {
+      procedures: [],
+      fields: [],
+      triggers: []
+    };
+
+    if ('procedures' in object && Array.isArray(object.procedures)) {
+      navigation.procedures = object.procedures.map((p: any) => ({
+        name: p.name,
+        line: p.lineNumber,
+        signature: p.signature || `${p.access?.toLowerCase() || 'public'} procedure ${p.name}(${p.parameters?.map((param: any) => `${param.name}: ${param.type}`).join('; ') || ''})`
+      }));
+    }
+
+    if ('fields' in object && Array.isArray(object.fields)) {
+      navigation.fields = object.fields.map((f: any) => ({
+        name: f.name,
+        type: f.type,
+        id: f.id
+      }));
+    }
+
+    if ('triggers' in object && Array.isArray(object.triggers)) {
+      navigation.triggers = object.triggers.map((t: any) => ({
+        name: t.name,
+        line: t.lineNumber
+      }));
+    }
+
+    // Get references
+    const relationships = await this.alAnalyzer.findRelationships(
+      object.name,
+      {
+        relationshipType: 'all',
+        maxDepth: 1,
+        branches: branch ? [branch] : undefined
+      }
+    );
+
+    const references = {
+      uses: relationships.edges
+        .filter(e => e.source.name === object.name && e.type === 'uses')
+        .map(e => e.target),
+      usedBy: relationships.edges
+        .filter(e => e.target.name === object.name && e.type === 'uses')
+        .map(e => e.source)
+    };
+
+    return {
+      object: {
+        type: object.type,
+        id: object.id,
+        name: object.name,
+        namespace: object.namespace,
+        caption: object.caption,
+        filePath: object.filePath,
+        branch: object.branch,
+        access: object.access,
+        extensible: object.extensible
+      },
+      sourceCode: object.sourceCode,
+      navigation,
+      references,
+      metadata: {
+        analyzedAt: new Date().toISOString(),
+        branch: branch || 'current',
+        linesOfCode: object.sourceCode?.split('\n').length || 0
+      }
+    };
+  }
+
+  private async findUsages(args: {
+    object_type: ALObjectType;
+    object_name: string;
+    search_in?: ALObjectType[];
+    branches?: string[];
+    include_code_context?: boolean;
+    max_results?: number;
+  }): Promise<any> {
+    const { 
+      object_type, 
+      object_name, 
+      search_in, 
+      branches, 
+      include_code_context = true,
+      max_results = 50 
+    } = args;
+
+    if (!object_type || !object_name) {
+      throw new McpError(ErrorCode.InvalidParams, 'Object type and name are required');
+    }
+
+    // Search for usages
+    const searchQuery = object_name;
+    const searchResults = await this.searchIndexer.search(searchQuery, {
+      branches,
+      maxResults: max_results * 2, // Get more results to filter
+      includeObsolete: false
+    });
+
+    // Filter to find actual usages
+    const usages: any[] = [];
+    
+    for (const item of searchResults.items || []) {
+      // Skip self-references
+      if (item.object.name === object_name && item.object.type === object_type) {
+        continue;
+      }
+
+      // Filter by search_in types if specified
+      if (search_in && !search_in.includes(item.object.type)) {
+        continue;
+      }
+
+      // Check if this object actually references our target
+      const usage: any = {
+        location: item.object,
+        score: item.score,
+        matches: []
+      };
+
+      // Check in procedures
+      if (item.preview?.procedures) {
+        item.preview.procedures.forEach(proc => {
+          if (proc.includes(object_name)) {
+            usage.matches.push({
+              type: 'procedure',
+              content: proc
+            });
+          }
+        });
+      }
+
+      // Check in fields
+      if (item.preview?.fields) {
+        item.preview.fields.forEach(field => {
+          if (field.includes(object_name)) {
+            usage.matches.push({
+              type: 'field',
+              content: field
+            });
+          }
+        });
+      }
+
+      // Add code context if requested
+      if (include_code_context && item.preview?.snippet) {
+        usage.codeContext = item.preview.snippet;
+      }
+
+      if (usage.matches.length > 0) {
+        usages.push(usage);
+      }
+    }
+
+    // Sort by score and limit results
+    usages.sort((a, b) => b.score - a.score);
+    const limitedUsages = usages.slice(0, max_results);
+
+    return {
+      targetObject: {
+        type: object_type,
+        name: object_name
+      },
+      usages: limitedUsages,
+      totalCount: usages.length,
+      searchTime: searchResults.searchTime,
+      branches: branches || ['current'],
+      metadata: {
+        searchedAt: new Date().toISOString(),
+        includesContext: include_code_context
+      }
+    };
   }
 
   private async performHealthCheck(): Promise<any> {
@@ -683,6 +896,78 @@ class ALMCPServer {
               description: 'Directory scan depth for AL projects'
             }
           }
+        }
+      },
+      
+      // Enhanced Code Browsing Tools
+      {
+        name: 'al_browse_code',
+        description: 'Browse BC code with full source, navigation structure, and references',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            object_type: {
+              type: 'string',
+              enum: ['table', 'page', 'codeunit', 'report', 'query', 'enum', 'interface', 'permissionset', 'xmlport', 'controladdin'],
+              description: 'AL object type'
+            },
+            object_name: {
+              type: 'string',
+              description: 'Object name (e.g., "Customer", "Sales Header")'
+            },
+            object_id: {
+              type: 'number',
+              description: 'Object ID (alternative to name)'
+            },
+            branch: {
+              type: 'string',
+              description: 'Branch to browse (default: current)'
+            },
+            context_lines: {
+              type: 'number',
+              default: 10,
+              description: 'Lines of context around matches'
+            }
+          },
+          required: ['object_type']
+        }
+      },
+      {
+        name: 'al_find_usages',
+        description: 'Find where a BC object is used across the codebase',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            object_type: {
+              type: 'string',
+              description: 'Type of object to find usages for'
+            },
+            object_name: {
+              type: 'string',
+              description: 'Name of object to find usages for'
+            },
+            search_in: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Limit search to specific object types'
+            },
+            branches: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Branches to search in'
+            },
+            include_code_context: {
+              type: 'boolean',
+              default: true,
+              description: 'Include code snippets showing usage'
+            },
+            max_results: {
+              type: 'number',
+              default: 50,
+              description: 'Maximum number of usages to return'
+            }
+          },
+          required: ['object_type', 'object_name']
         }
       }
     ];

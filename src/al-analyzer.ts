@@ -9,13 +9,11 @@ import {
   DependencyGraph,
   ALTable,
   ALCodeunit,
-  ALPage,
   PermissionInfo
 } from './types/al-objects';
 import {
   ALObjectType,
-  RelationshipType,
-  ExtensionDependency
+  RelationshipType
 } from './types/al-types';
 
 export interface RelationshipOptions {
@@ -181,8 +179,8 @@ export class ALAnalyzer {
       result.permissions = await this.getObjectPermissions(targetObject);
     }
 
-    // Include source code if requested
-    if (options.include_source_code) {
+    // Always include source code unless it's already present or summary only
+    if (!options.include_summary_only && !result.sourceCode) {
       try {
         result.sourceCode = await this.gitManager.getFileContent(targetObject.filePath, targetObject.branch);
         this.logger.debug(`Retrieved source code for ${targetObject.type} ${targetObject.name}`, {
@@ -192,6 +190,19 @@ export class ALAnalyzer {
         this.logger.warn(`Failed to retrieve source code for ${targetObject.type} ${targetObject.name}`, { error });
         result.sourceCodeError = 'Failed to retrieve source code';
       }
+    }
+    
+    // Extract code preview if not already present
+    if (!result.codePreview && result.sourceCode) {
+      const lines = result.sourceCode.split('\n');
+      const previewStart = Math.max(0, targetObject.lineNumber - 1);
+      const previewEnd = Math.min(previewStart + 30, lines.length);
+      
+      result.codePreview = {
+        startLine: previewStart + 1,
+        endLine: previewEnd,
+        content: lines.slice(previewStart, previewEnd).join('\n')
+      };
     }
 
     // Add size estimation to help users understand response size

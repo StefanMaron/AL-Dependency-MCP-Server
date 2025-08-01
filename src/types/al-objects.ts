@@ -17,6 +17,8 @@ export interface ALObject {
   obsoleteTag?: string;
   access?: 'Public' | 'Internal' | 'Local';
   extensible?: boolean;
+  codePreview?: CodeSnippet;
+  sourceCode?: string;
 }
 
 export interface ALTable extends ALObject {
@@ -132,6 +134,8 @@ export interface ALProcedure {
   eventType?: 'Publisher' | 'Subscriber';
   eventPublisher?: ObjectReference;
   triggers?: ALTrigger[];
+  codeSnippet?: string;
+  signature?: string;
 }
 
 export interface ALParameter {
@@ -298,10 +302,63 @@ export interface DependencyGraph {
   };
 }
 
+export interface CodeSnippet {
+  startLine: number;
+  endLine: number;
+  content: string;
+  highlights?: CodeHighlight[];
+}
+
+export interface CodeHighlight {
+  line: number;
+  column?: number;
+  length?: number;
+  type: 'match' | 'definition' | 'reference';
+}
+
+export interface SearchResultItem {
+  object: ObjectReference;
+  score: number;
+  preview?: {
+    fields?: string[];
+    procedures?: string[];
+    triggers?: string[];
+    snippet?: CodeSnippet;
+  };
+  matches?: SearchMatch[];
+  relatedObjects?: string[];
+}
+
+export interface SearchMatch {
+  type: 'name' | 'caption' | 'field' | 'procedure' | 'code';
+  line: number;
+  content: string;
+  context?: string;
+}
+
 export interface SearchResult {
   objects: ObjectReference[];
+  items?: SearchResultItem[];
   totalCount: number;
   branches: string[];
   searchTime: number;
   filters: any;
+  facets?: {
+    types?: Record<ALObjectType, number>;
+    namespaces?: Record<string, number>;
+  };
+}
+
+export interface BrowseResult {
+  object: ALObject;
+  sourceCode: string;
+  navigation: {
+    procedures: Array<{ name: string; line: number; signature: string }>;
+    fields?: Array<{ name: string; line: number; type: string }>;
+    triggers?: Array<{ name: string; line: number }>;
+  };
+  references: {
+    uses: ObjectReference[];
+    usedBy: ObjectReference[];
+  };
 }

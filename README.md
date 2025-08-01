@@ -48,9 +48,11 @@ docker run -p 3000:3000 \
 - `al_repo_status` - Get repository status and health
 
 ### BC Code Browsing
-- `al_search_objects` - Search BC objects by name/type
-- `al_get_object` - Get detailed object information
+- `al_search_objects` - Search BC objects with code preview and context
+- `al_get_object` - Get detailed object information with full source code
 - `al_find_relationships` - Find object dependencies
+- `al_browse_code` - Browse BC code with navigation structure and references
+- `al_find_usages` - Find where objects are used across the codebase
 - `al_workspace_overview` - Analyze local AL workspace
 
 ## MCP Integration
@@ -288,19 +290,25 @@ docker-compose -f docker-compose.examples.yml up --build
 
 ### Search AL Objects
 ```typescript
-// Find Customer table across BC versions
+// Find Customer table with code preview
 await mcp.call("al_search_objects", {
   query: "Customer",
   object_type: "table", 
-  branches: ["w1-26", "w1-24"]
-});
-
-// Search Microsoft base objects
-await mcp.call("al_search_objects", {
-  query: "Customer",
-  namespace: "Microsoft.*",
   branches: ["w1-26"]
 });
+
+// Returns enhanced results with preview:
+{
+  items: [{
+    object: { type: "table", name: "Customer", id: 18 },
+    preview: {
+      fields: ["No.: Code[20]", "Name: Text[100]"],
+      procedures: ["procedure CalcCreditLimitLCY(): Decimal"],
+      snippet: { content: "table 18 Customer\n{..." }
+    }
+  }],
+  facets: { types: { table: 1 }, namespaces: { "Microsoft.Sales": 1 } }
+}
 ```
 
 ### Dependency Discovery
@@ -312,6 +320,56 @@ await mcp.call("al_find_relationships", {
   max_depth: 2,
   branches: ["w1-26"]
 });
+```
+
+### Browse Code with Navigation
+```typescript
+// Browse Customer table with full source and navigation
+await mcp.call("al_browse_code", {
+  object_type: "table",
+  object_name: "Customer"
+});
+
+// Returns:
+{
+  object: { type: "table", name: "Customer", id: 18 },
+  sourceCode: "table 18 Customer\n{\n    fields\n    {...}",
+  navigation: {
+    fields: [
+      { name: "No.", type: "Code[20]", id: 1 },
+      { name: "Name", type: "Text[100]", id: 2 }
+    ],
+    procedures: [
+      { name: "CalcCreditLimitLCY", line: 150, signature: "procedure CalcCreditLimitLCY(): Decimal" }
+    ]
+  },
+  references: {
+    uses: ["Sales Header", "Currency"],
+    usedBy: ["Sales Document", "Customer List Page"]
+  }
+}
+```
+
+### Find Object Usages
+```typescript
+// Find where Customer table is used
+await mcp.call("al_find_usages", {
+  object_type: "table",
+  object_name: "Customer",
+  search_in: ["page", "codeunit"],
+  include_code_context: true
+});
+
+// Returns:
+{
+  usages: [{
+    location: { type: "page", name: "Customer List" },
+    matches: [
+      { type: "field", content: "SourceTable = Customer" }
+    ],
+    codeContext: { content: "page 22 \"Customer List\"\n{..." }
+  }]
+}
 ```
 
 ### Repository Management

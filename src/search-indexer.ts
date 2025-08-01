@@ -7,7 +7,9 @@ import { GitManager } from './git-manager';
 import {
   ALObject,
   ObjectReference,
-  SearchResult
+  SearchResult,
+  SearchResultItem,
+  CodeSnippet
 } from './types/al-objects';
 import { ALObjectType, SearchFilters } from './types/al-types';
 
@@ -28,6 +30,9 @@ export interface IndexedObject {
   isObsolete: boolean;
   lastModified: Date;
   size: number;
+  codePreview?: CodeSnippet;
+  procedures?: Array<{ name: string; line: number; signature?: string }>;
+  fields?: Array<{ name: string; type: string }>;
 }
 
 export interface IndexMetadata {
@@ -296,6 +301,25 @@ export class SearchIndexer {
       // Use current time if file stats are unavailable
     }
 
+    // Extract procedures and fields for preview
+    let procedures: Array<{ name: string; line: number; signature?: string }> = [];
+    let fields: Array<{ name: string; type: string }> = [];
+    
+    if ('procedures' in obj && Array.isArray(obj.procedures)) {
+      procedures = obj.procedures.map(p => ({ 
+        name: p.name, 
+        line: p.lineNumber,
+        signature: p.signature
+      }));
+    }
+    
+    if ('fields' in obj && Array.isArray(obj.fields)) {
+      fields = obj.fields.map(f => ({ 
+        name: f.name, 
+        type: f.type 
+      }));
+    }
+
     return {
       type: obj.type,
       id: obj.id,
@@ -307,7 +331,10 @@ export class SearchIndexer {
       keywords,
       isObsolete: obj.isObsolete || false,
       lastModified,
-      size
+      size,
+      codePreview: obj.codePreview,
+      procedures: procedures.length > 0 ? procedures : undefined,
+      fields: fields.length > 0 ? fields : undefined
     };
   }
 
@@ -393,12 +420,29 @@ export class SearchIndexer {
       const searchTime = Date.now() - startTime;
       this.updatePerformanceMetrics(searchTime);
 
+      // Build enhanced search result with previews
+      const searchItems: SearchResultItem[] = limitedResults.map(item => ({
+        object: this.toObjectReference(item.object),
+        score: item.score,
+        preview: {
+          fields: item.object.fields?.slice(0, 5).map(f => `${f.name}: ${f.type}`),
+          procedures: item.object.procedures?.slice(0, 5).map(p => p.signature || p.name),
+          snippet: item.object.codePreview
+        },
+        relatedObjects: this.extractRelatedObjects(item.object)
+      }));
+      
+      // Calculate facets
+      const facets = this.calculateFacets(searchResults);
+
       const result: SearchResult = {
         objects: limitedResults.map(item => this.toObjectReference(item.object)),
+        items: searchItems,
         totalCount: searchResults.length,
         branches: searchBranches,
         searchTime,
-        filters: options
+        filters: options,
+        facets
       };
 
       // Cache result
@@ -596,6 +640,48 @@ export class SearchIndexer {
     }
     
     this.searchCache.set(key, result);
+  }
+
+  private extractRelatedObjects(obj: IndexedObject): string[] {
+    const related: Set<string> = new Set();
+    
+    // Extract from procedures if available
+    if (obj.procedures) {
+      obj.procedures.forEach(proc => {
+        if (proc.signature) {
+          // Extract types from parameters
+          const typeMatches = proc.signature.match(/Record\s+"([^"]+)"/g);
+          if (typeMatches) {
+            typeMatches.forEach(match => {
+              const tableName = match.match(/Record\s+"([^"]+)"/)?.[1];
+              if (tableName) related.add(tableName);
+            });
+          }
+        }
+      });
+    }
+    
+    return Array.from(related);
+  }
+
+  private calculateFacets(results: Array<{object: IndexedObject, score: number}>): any {
+    const typeCounts: Record<string, number> = {};
+    const namespaceCounts: Record<string, number> = {};
+    
+    results.forEach(({ object }) => {
+      // Count types
+      typeCounts[object.type] = (typeCounts[object.type] || 0) + 1;
+      
+      // Count namespaces
+      if (object.namespace) {
+        namespaceCounts[object.namespace] = (namespaceCounts[object.namespace] || 0) + 1;
+      }
+    });
+    
+    return {
+      types: typeCounts,
+      namespaces: namespaceCounts
+    };
   }
 
   async removeBranchIndex(branchName: string): Promise<void> {

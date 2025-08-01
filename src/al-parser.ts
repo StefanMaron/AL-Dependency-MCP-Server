@@ -14,12 +14,10 @@ import {
   ALInterface,
   ALPermissionSet,
   ALField,
-  ALKey,
   ALTrigger,
   ALProcedure,
   ALParameter,
   ALVariable,
-  ALEvent,
   ObjectReference
 } from './types/al-objects';
 import { ALObjectType } from './types/al-types';
@@ -50,7 +48,6 @@ export class ALParser {
   private procedurePattern!: RegExp;
   private triggerPattern!: RegExp;
   private variablePattern!: RegExp;
-  private eventPattern!: RegExp;
 
   constructor(logger: Logger) {
     this.logger = logger;
@@ -89,9 +86,6 @@ export class ALParser {
 
     // Variable pattern
     this.variablePattern = /^\s*(\w+)\s*:\s*([^;]+);/i;
-
-    // Event pattern (simplified)
-    this.eventPattern = /^\s*\[(\w+)\]\s*$/i;
   }
 
   async parseFile(filePath: string, branch: string, options: ParseOptions = { includeObsolete: false, includeDetails: true, validateSyntax: false }): Promise<ParseResult> {
@@ -104,6 +98,7 @@ export class ALParser {
       const lines = content.split('\n');
       
       let currentObject: ALObject | null = null;
+      let objectStartLine = 0;
       let braceLevel = 0;
       let currentSection: 'fields' | 'keys' | 'triggers' | 'procedures' | 'variables' | 'layout' | 'actions' | 'dataset' | null = null;
 
@@ -124,6 +119,7 @@ export class ALParser {
             const objectInfo = this.parseObjectDeclaration(line, filePath, lineNumber, branch);
             if (objectInfo) {
               currentObject = objectInfo;
+              objectStartLine = lineNumber;
               continue;
             }
           }
@@ -141,6 +137,18 @@ export class ALParser {
 
           // Object complete
           if (currentObject && braceLevel === 0 && line.trim() === '}') {
+            // Extract code preview
+            if (options.includeDetails) {
+              currentObject.codePreview = {
+                startLine: objectStartLine,
+                endLine: lineNumber,
+                content: lines.slice(objectStartLine - 1, Math.min(objectStartLine + 20, lineNumber)).join('\n')
+              };
+              
+              // Store full source code if needed
+              currentObject.sourceCode = lines.slice(objectStartLine - 1, lineNumber).join('\n');
+            }
+            
             if (options.includeObsolete || !currentObject.isObsolete) {
               objects.push(currentObject);
             }
@@ -524,6 +532,9 @@ export class ALParser {
     const paramString = match[3] || '';
     const returnType = match[4] ? match[4].trim() : undefined;
 
+    // Build signature
+    const signature = `${access.toLowerCase()} procedure ${name}(${paramString})${returnType ? ': ' + returnType : ''}`;
+
     return {
       name,
       lineNumber,
@@ -531,7 +542,9 @@ export class ALParser {
       parameters: this.parseParameters(paramString),
       returnType,
       isObsolete: false,
-      isEvent: false
+      isEvent: false,
+      signature,
+      codeSnippet: line.trim()
     };
   }
 
