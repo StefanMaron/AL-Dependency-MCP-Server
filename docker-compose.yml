@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   al-mcp-server:
+    container_name: al-mcp-server
     build: .
     volumes:
       - repo-cache:/app/.cache/repo-cache

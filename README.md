@@ -71,15 +71,15 @@ docker build -t aldependencymcp-al-mcp-server .
 
 2. **Add to Claude Desktop:**
 ```bash
-claude mcp add al-mcp-server -s user -- docker run --rm -i --user alserver aldependencymcp-al-mcp-server node dist/server.js
+claude mcp add al-mcp-server -s user -- docker run --rm -i aldependencymcp-al-mcp-server node dist/server.js
 ```
 
 3. **Override environment variables (optional):**
 ```bash
-claude mcp add al-mcp-server -s user -- docker run --rm -i --user alserver 
-  -e DEFAULT_BRANCH=w1-25 
-  -e CLONE_DEPTH=5 
-  -e MAX_BRANCHES=15 
+claude mcp add al-mcp-server -s user -- docker run --rm -i \
+  -e DEFAULT_BRANCH=w1-25 \
+  -e CLONE_DEPTH=5 \
+  -e MAX_BRANCHES=15 \
   aldependencymcp-al-mcp-server node dist/server.js
 ```
 
@@ -106,7 +106,7 @@ LOG_LEVEL=info
 EOF
 
 # Add to Claude with environment file
-claude mcp add al-mcp-server -s user -- docker run --rm -i --user alserver --env-file /path/to/mcp.env aldependencymcp-al-mcp-server node dist/server.js
+claude mcp add al-mcp-server -s user -- docker run --rm -i --env-file /path/to/mcp.env aldependencymcp-al-mcp-server node dist/server.js
 ```
 
 ### GitHub Copilot for VS Code Integration
@@ -219,7 +219,7 @@ npm run build
 3. **Permission issues**
    ```bash
    # Ensure proper user permissions
-   docker run --rm -i --user alserver aldependencymcp-al-mcp-server node dist/server.js
+   docker run --rm -i aldependencymcp-al-mcp-server node dist/server.js
    ```
 
 4. **Network connectivity**
@@ -231,7 +231,7 @@ npm run build
 To enable debug logging, set `LOG_LEVEL=debug`:
 
 ```bash
-claude mcp add al-mcp-server -s user -- docker run --rm -i --user alserver 
+claude mcp add al-mcp-server -s user -- docker run --rm -i  
   -e LOG_LEVEL=debug 
   aldependencymcp-al-mcp-server node dist/server.js
 ```
