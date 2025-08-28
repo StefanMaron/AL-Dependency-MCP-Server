@@ -51,6 +51,39 @@ export interface ResolveSymbolArgs extends MCPToolArgs {
   symbolType?: string;
 }
 
+export interface SearchProceduresArgs extends MCPToolArgs {
+  objectName: string;
+  objectType?: string;
+  procedurePattern?: string;
+  limit?: number;
+  offset?: number;
+  includeDetails?: boolean;
+}
+
+export interface SearchFieldsArgs extends MCPToolArgs {
+  objectName: string;
+  fieldPattern?: string;
+  limit?: number;
+  offset?: number;
+  includeDetails?: boolean;
+}
+
+export interface SearchControlsArgs extends MCPToolArgs {
+  objectName: string;
+  controlPattern?: string;
+  limit?: number;
+  offset?: number;
+  includeDetails?: boolean;
+}
+
+export interface SearchDataItemsArgs extends MCPToolArgs {
+  objectName: string;
+  dataItemPattern?: string;
+  limit?: number;
+  offset?: number;
+  includeDetails?: boolean;
+}
+
 // Tool result types
 export interface SearchObjectsResult {
   objects: ALObject[];
@@ -89,4 +122,51 @@ export interface GetDependenciesResult {
   dependencies: ALPackageInfo[];
   dependents: ALPackageInfo[];
   dependencyTree: string[];
+}
+
+export interface SearchProceduresResult {
+  objectName: string;
+  objectType: string;
+  procedures: any[];
+  totalFound: number;
+  returned: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
+  executionTimeMs: number;
+}
+
+export interface SearchFieldsResult {
+  objectName: string;
+  fields: any[];
+  totalFound: number;
+  returned: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
+  executionTimeMs: number;
+}
+
+export interface SearchControlsResult {
+  objectName: string;
+  objectType: string;
+  controls: any[];
+  totalFound: number;
+  returned: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
+  executionTimeMs: number;
+}
+
+export interface SearchDataItemsResult {
+  objectName: string;
+  objectType: string;
+  dataItems: any[];
+  totalFound: number;
+  returned: number;
+  offset: number;
+  limit: number;
+  hasMore: boolean;
+  executionTimeMs: number;
 }

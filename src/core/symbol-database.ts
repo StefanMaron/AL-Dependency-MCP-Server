@@ -137,6 +137,42 @@ export class OptimizedSymbolDatabase implements ALSymbolDatabase {
   }
 
   /**
+   * Get controls for a specific page
+   */
+  getPageControls(objectName: string): any[] {
+    const results: any[] = [];
+    
+    for (const obj of this.allObjects) {
+      if (obj.Name === objectName && obj.Type === 'Page' && (obj as any).Controls) {
+        results.push(...((obj as any).Controls));
+      }
+    }
+    
+    return results;
+  }
+
+  /**
+   * Get data items for a specific report or xmlport
+   */
+  getDataItems(objectName: string): any[] {
+    const results: any[] = [];
+    
+    for (const obj of this.allObjects) {
+      if (obj.Name === objectName) {
+        if (obj.Type === 'Report' && (obj as any).DataItems) {
+          results.push(...((obj as any).DataItems));
+        } else if (obj.Type === 'Query' && (obj as any).DataItems) {
+          results.push(...((obj as any).DataItems));
+        } else if (obj.Type === 'XmlPort' && (obj as any).Schema) {
+          results.push(...((obj as any).Schema));
+        }
+      }
+    }
+    
+    return results;
+  }
+
+  /**
    * Find references to a target object
    */
   findReferences(targetName: string, referenceType?: string, sourceType?: string): ALReference[] {
