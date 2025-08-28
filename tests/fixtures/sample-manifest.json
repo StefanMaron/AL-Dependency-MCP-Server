@@ -1,0 +1,42 @@
+{
+  "id": "437dbf0e-84ff-417a-965d-ed2bb9650972",
+  "name": "Base Application",
+  "publisher": "Microsoft",
+  "version": "24.0.0.0",
+  "brief": "",
+  "description": "",
+  "privacyStatement": "",
+  "EULA": "",
+  "help": "",
+  "url": "",
+  "logo": "",
+  "dependencies": [
+    {
+      "id": "63ca2fa4-4f03-4f2b-a480-172fef340d3f",
+      "publisher": "Microsoft",
+      "name": "System Application",
+      "version": "24.0.0.0"
+    },
+    {
+      "id": "dd0be2ea-f733-4d65-bb34-a28f4624fb14",
+      "publisher": "Microsoft", 
+      "name": "Library Manager",
+      "version": "24.0.0.0"
+    }
+  ],
+  "screenshots": [],
+  "platform": "24.0.0.0",
+  "application": "24.0.0.0",
+  "idRanges": [
+    {
+      "from": 1,
+      "to": 99999999
+    }
+  ],
+  "contextSensitiveHelpUrl": "https://go.microsoft.com/fwlink/?linkid=2081236",
+  "showMyCode": true,
+  "runtime": "11.0",
+  "features": [
+    "NoImplicitWith"
+  ]
+}

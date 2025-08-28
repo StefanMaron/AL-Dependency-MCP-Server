@@ -1,0 +1,36 @@
+{
+  "name": "al-mcp-server",
+  "version": "1.0.0",
+  "description": "**Model Context Protocol (MCP) server providing intelligent AL (Application Language) code assistance for Microsoft Dynamics 365 Business Central development.**",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "ts-node src/index.ts",
+    "start": "node dist/index.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "clean": "rm -rf dist",
+    "setup": "npm run build && node -e \"require('./dist/cli/al-installer.js').ALInstaller.prototype.ensureALAvailable().then(console.log)\"",
+    "install-al": "dotnet tool install --global Microsoft.Dynamics.AL.Tools",
+    "check-al": "AL --version"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.17.4",
+    "fast-glob": "^3.3.3",
+    "glob": "^11.0.3",
+    "stream-json": "^1.9.1"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.3.0",
+    "jest": "^30.1.1",
+    "ts-jest": "^29.4.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2"
+  }
+}

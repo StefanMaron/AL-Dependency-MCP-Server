@@ -1,0 +1,159 @@
+{
+  "RuntimeVersion": "24.0.0.0",
+  "Namespaces": [
+    {
+      "Name": "Microsoft.Sales.Customer",
+      "Tables": [
+        {
+          "Id": 18,
+          "Name": "Customer",
+          "Properties": [
+            {
+              "Name": "DataClassification",
+              "Value": "CustomerContent"
+            }
+          ],
+          "Fields": [
+            {
+              "Id": 1,
+              "Name": "No.",
+              "TypeDefinition": {
+                "Name": "Code",
+                "Length": 20
+              },
+              "Properties": [
+                {
+                  "Name": "Caption",
+                  "Value": "No."
+                }
+              ]
+            },
+            {
+              "Id": 2,
+              "Name": "Name",
+              "TypeDefinition": {
+                "Name": "Text",
+                "Length": 100
+              },
+              "Properties": [
+                {
+                  "Name": "Caption",
+                  "Value": "Name"
+                }
+              ]
+            },
+            {
+              "Id": 3,
+              "Name": "Search Name",
+              "TypeDefinition": {
+                "Name": "Code",
+                "Length": 100
+              },
+              "Properties": [
+                {
+                  "Name": "Caption",
+                  "Value": "Search Name"
+                }
+              ]
+            }
+          ],
+          "Keys": [
+            {
+              "Fields": ["No."],
+              "Properties": [
+                {
+                  "Name": "Clustered",
+                  "Value": true
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "Pages": [
+        {
+          "Id": 21,
+          "Name": "Customer Card",
+          "Properties": [
+            {
+              "Name": "PageType",
+              "Value": "Card"
+            },
+            {
+              "Name": "SourceTable",
+              "Value": "Customer"
+            }
+          ]
+        },
+        {
+          "Id": 22,
+          "Name": "Customer List",
+          "Properties": [
+            {
+              "Name": "PageType", 
+              "Value": "List"
+            },
+            {
+              "Name": "SourceTable",
+              "Value": "Customer"
+            }
+          ]
+        }
+      ],
+      "Codeunits": [
+        {
+          "Id": 60,
+          "Name": "Sales-Post",
+          "Procedures": [
+            {
+              "Name": "PostSalesHeader",
+              "Parameters": [
+                {
+                  "Name": "SalesHeader",
+                  "TypeDefinition": {
+                    "Name": "Record",
+                    "RecordDefinition": {
+                      "TableName": "Sales Header"
+                    }
+                  },
+                  "ByReference": true
+                }
+              ],
+              "ReturnTypeDefinition": {
+                "Name": "Boolean"
+              }
+            }
+          ]
+        }
+      ],
+      "Reports": [
+        {
+          "Id": 101,
+          "Name": "Customer - Order Summary",
+          "Dataset": [
+            {
+              "Name": "Customer",
+              "SourceTable": "Customer"
+            }
+          ]
+        }
+      ],
+      "Enums": [
+        {
+          "Id": 1,
+          "Name": "Customer Posting Group",
+          "Values": [
+            {
+              "Id": 0,
+              "Name": "DOMESTIC"
+            },
+            {
+              "Id": 1, 
+              "Name": "EXPORT"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
