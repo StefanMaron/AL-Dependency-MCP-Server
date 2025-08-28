@@ -168,55 +168,94 @@ npm run build
 
 ### Usage Examples
 
-Once configured with your coding assistant, you can interact naturally:
+Once configured with your coding assistant, you can interact naturally using token-efficient approaches:
 
-**Search for objects:**
+**🎯 Smart Object Discovery:**
 ```
-"Show me all Customer-related tables in my AL project"
-"Find codeunits that handle posting procedures"
-"What interfaces are available for inventory management?"
-```
-
-**Get detailed information:**
-```
-"Show me the complete definition of the Customer table"
-"What fields does the Sales Header table have?"  
-"List all procedures in the Sales-Post codeunit"
+"Show me Customer tables" → Uses al_search_objects with smart limits
+"What functions does the Sales-Post codeunit have?" → Uses al_get_object_summary (96% token reduction!)
+"Find posting codeunits" → Uses al_search_by_domain for business-focused results
 ```
 
-**Analyze relationships:**
+**🔍 Detailed Analysis (When Needed):**
 ```
-"What objects extend the Item table?"
-"Find all tables that reference the Customer table"
-"Show me the dependency graph for my extension"
+"Show me the Customer table structure" → Uses al_get_object_definition with summaryMode
+"What validation procedures are in Item table?" → Uses al_search_procedures with pattern filtering
+"List fields containing 'Code' in Sales Header" → Uses al_search_fields with targeted patterns
 ```
 
-The assistant will automatically:
+**🔗 Relationship Analysis:**
+```
+"What objects extend the Item table?" → Uses al_get_extensions
+"Find tables that reference Customer" → Uses al_find_references
+"Show me package statistics" → Uses al_get_stats for overview
+```
+
+**✅ The assistant will now automatically:**
+- Choose the most token-efficient tool for each question
 - Auto-discover AL packages in your workspace
-- Load and index all available symbols  
-- Provide intelligent responses based on your actual AL codebase
+- Load and index all available symbols with optimized responses
+- Provide organized, categorized information instead of overwhelming data dumps
 
 ## 🛠 Available MCP Tools
 
-### Core Search & Discovery
+### 🎯 Quick Reference - When to Use Which Tool
 
-#### `al_search_objects`
+| **For This Question** | **Use This Tool** | **Why** |
+|---|---|---|
+| "What functions does the Sales-Post codeunit have?" | `al_get_object_summary` | ✅ Organized, categorized view (< 1K tokens) |
+| "Show me all Customer tables" | `al_search_objects` | ✅ Fast search with summaryMode |
+| "Find a specific table definition" | `al_get_object_definition` | ✅ Complete details for single object |
+| "List procedures in MyCodeunit" | `al_search_procedures` | ✅ Targeted procedure search |
+
+### ⚠️ Token Usage Guidelines
+
+**Large Response Warning:** Some tools can generate very large responses (10K+ tokens) that may exceed AI context limits. Always use the most specific tool for your needs.
+
+**Recommended Approach:**
+1. **Start with summary tools** (`al_get_object_summary`, `summaryMode: true`)
+2. **Use filters and limits** (`limit`, `offset`, `objectType`)
+3. **Search specifically** (exact names vs wildcards)
+4. **Drill down gradually** (summary → specific details)
+
+### 🔍 Object Search & Discovery
+
+#### `al_search_objects` ⚠️ **Can generate large responses**
 Search AL objects across loaded packages.
+
+**⚠️ TOKEN WARNING:** Without limits, this can return 10K+ tokens. Use `summaryMode: true` and `limit` parameter.
 
 **Parameters:**
 - `pattern` (required): Search pattern with wildcard support (`Customer*`, `*Ledger*`)
 - `objectType` (optional): Filter by type (`Table`, `Page`, `Codeunit`, etc.)
 - `packageName` (optional): Filter by package name
-- `includeFields` (optional): Include field definitions for tables
-- `includeProcedures` (optional): Include procedure definitions
+- `limit` (optional): Maximum results to return (recommended: 20)
+- `summaryMode` (optional): Return condensed view (recommended: true)
+- `includeFields` (optional): Include field definitions for tables ⚠️ **Increases tokens significantly**
+- `includeProcedures` (optional): Include procedure definitions ⚠️ **Increases tokens significantly**
 
-#### `al_get_object_definition`
+#### `al_get_object_summary` ✅ **Optimized for large objects**
+Get intelligent summary of AL objects with categorized procedures/functions.
+
+**✅ TOKEN EFFICIENT:** Designed for complex objects like Sales-Post (600+ procedures) - returns organized categories instead of raw lists.
+
+**Parameters:**
+- `objectName` (required): Name of the object to summarize
+- `objectType` (optional): Type for disambiguation (`Table`, `Page`, `Codeunit`, etc.)
+
+**Best for:** Understanding complex codeunits, getting function overviews, categorized procedure lists
+
+#### `al_get_object_definition` ⚠️ **Can be large for complex objects**
 Get complete object definition with all metadata.
 
 **Parameters:**
-- `objectId` (required): Object ID (e.g., `18` for Customer table)
+- `objectId` or `objectName` (required): Object identifier
 - `objectType` (required): Object type (`Table`, `Page`, etc.)
 - `packageName` (optional): Package name for conflict resolution
+- `summaryMode` (optional): Return condensed view (recommended: true for large objects)
+- `includeProcedures` (optional): Include procedure definitions ⚠️ **Can be very large**
+- `includeFields` (optional): Include field definitions
+- `procedureLimit` (optional): Limit procedures returned (recommended: 20)
 
 #### `al_find_references`
 Find objects that reference a target object.
@@ -228,39 +267,151 @@ Find objects that reference a target object.
 
 ### Package Management
 
-#### `al_load_packages`
+#### `al_load_packages` ✅ **Setup & initialization**
 Load AL packages from specified directory.
+
+**✅ TOKEN EFFICIENT:** Returns simple confirmation and package count.
 
 **Parameters:**
 - `packagesPath` (required): Path to directory containing .app files
-- `forceReload` (optional): Force reload even if already loaded
+- `forceReload` (optional): Force reload even if already loaded (default: false)
 
-#### `al_auto_discover`
+**Best for:** Manual package loading, custom package directories
+
+#### `al_auto_discover` ✅ **Automatic setup**
 Auto-discover and load packages from .alpackages directories.
+
+**✅ TOKEN EFFICIENT:** Returns discovery results and loaded package summary.
 
 **Parameters:**
 - `rootPath` (optional): Root path to search (defaults to current directory)
 
-#### `al_list_packages`
+**Best for:** Initial setup, workspace discovery, finding standard AL packages
+
+#### `al_list_packages` ✅ **Quick overview**
 List currently loaded packages and their statistics.
 
-### Advanced Analysis
+**✅ TOKEN EFFICIENT:** Compact list with object counts per package.
 
-#### `al_search_by_domain`
+**No parameters required** - shows all loaded packages with their object counts and versions.
+
+### 🔍 Detailed Search Within Objects
+
+#### `al_search_procedures` ✅ **Targeted search**
+Search procedures within a specific AL object.
+
+**Parameters:**
+- `objectName` (required): Name of the object to search in
+- `objectType` (optional): Type for disambiguation (`Codeunit`, `Table`, etc.)
+- `procedurePattern` (optional): Pattern to filter procedures (`*Post*`, `Validate*`)
+- `limit` (optional): Maximum procedures to return (default: 20)
+- `includeDetails` (optional): Include full procedure details (default: true)
+
+#### `al_search_fields` ✅ **Targeted search**
+Search fields within a specific table.
+
+**Parameters:**
+- `objectName` (required): Name of the table to search in
+- `fieldPattern` (optional): Pattern to filter fields (`*Code*`, `*Date`)
+- `limit` (optional): Maximum fields to return (default: 20)
+- `includeDetails` (optional): Include full field details (default: true)
+
+#### `al_search_controls` ✅ **Targeted search**
+Search controls within a specific page.
+
+**Parameters:**
+- `objectName` (required): Name of the page to search in
+- `controlPattern` (optional): Pattern to filter controls (`*Button*`, `*Field`)
+- `limit` (optional): Maximum controls to return (default: 20)
+
+#### `al_search_dataitems` ✅ **Targeted search**
+Search data items within reports, queries, or xmlports.
+
+**Parameters:**
+- `objectName` (required): Name of the report/query/xmlport
+- `dataItemPattern` (optional): Pattern to filter data items
+- `limit` (optional): Maximum data items to return (default: 20)
+
+### 📊 Advanced Analysis
+
+#### `al_search_by_domain` ✅ **Business-focused search**
 Search objects by business domain.
 
 **Parameters:**
 - `domain` (required): Business domain (`Sales`, `Finance`, `Inventory`, etc.)
 - `objectTypes` (optional): Filter by object types
 
-#### `al_get_extensions`
+#### `al_get_extensions` ✅ **Relationship analysis**
 Get objects that extend a base object.
 
 **Parameters:**
 - `baseObjectName` (required): Name of base object
 
-#### `al_get_stats`
+#### `al_get_stats` ✅ **Performance metrics**
 Get database statistics and performance metrics.
+
+**No parameters required** - returns comprehensive statistics about loaded packages.
+
+## 💡 Usage Examples with Token Guidance
+
+### 🟢 **Recommended Patterns** (Token Efficient)
+
+#### Understanding Complex Objects
+```
+Question: "What functions does the Sales-Post codeunit have?"
+✅ Use: al_get_object_summary
+Response: ~400 tokens with organized categories
+```
+
+#### Finding Specific Objects
+```
+Question: "Show me Customer tables"
+✅ Use: al_search_objects with summaryMode: true, limit: 20
+Response: ~800 tokens with table list
+```
+
+#### Targeted Searches
+```
+Question: "What validation procedures are in the Customer table?"
+✅ Use: al_search_procedures with procedurePattern: "*Validate*"
+Response: ~600 tokens with focused results
+```
+
+### 🔴 **Avoid These Patterns** (Token Heavy)
+
+#### ❌ Unfiltered Broad Searches
+```
+❌ al_search_objects with pattern: "*" (returns all objects)
+❌ al_get_object_definition with includeProcedures: true on complex objects
+❌ al_search_objects with includeFields: true and includeProcedures: true
+```
+
+### 📋 **Step-by-Step Approach**
+
+1. **Start Broad, Stay Efficient**
+   ```
+   al_search_objects → summaryMode: true, limit: 20
+   ```
+
+2. **Then Get Organized Summary**
+   ```
+   al_get_object_summary → categorized view of functions
+   ```
+
+3. **Finally Drill Down**
+   ```
+   al_search_procedures → specific procedure patterns
+   ```
+
+### 🎯 **Token Estimates by Tool**
+
+| Tool | Typical Response | Large Object | With Limits |
+|------|-----------------|--------------|-------------|
+| `al_get_object_summary` | ~400 tokens | ~600 tokens | N/A (always optimized) |
+| `al_search_objects` (summary) | ~800 tokens | ~1,500 tokens | ~500 tokens |
+| `al_get_object_definition` (summary) | ~1,200 tokens | ~3,000 tokens | ~800 tokens |
+| `al_search_procedures` | ~600 tokens | ~1,000 tokens | ~400 tokens |
+| `al_search_objects` (detailed) | ~5,000 tokens | **15,000+ tokens** ⚠️ | ~2,000 tokens |
 
 ## 📊 Performance Benchmarks
 
