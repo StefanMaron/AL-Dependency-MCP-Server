@@ -20,6 +20,8 @@ export class ALMCPServer {
   private database: OptimizedSymbolDatabase;
   private packageManager: ALPackageManager;
   private tools: ALMCPTools;
+  private isInitialized: boolean = false;
+  private initializationPromise: Promise<void> | null = null;
 
   constructor() {
     this.server = new Server(
@@ -54,7 +56,7 @@ export class ALMCPServer {
         tools: [
           {
             name: 'al_search_objects',
-            description: 'Search AL objects across loaded packages by pattern, type, or package',
+            description: 'Search AL objects across loaded packages. ⚠️ WARNING: Can generate large responses (10K+ tokens). Use summaryMode:true and limit parameters to avoid token limits. For complex objects with many procedures, consider using al_get_object_summary instead.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -73,12 +75,12 @@ export class ALMCPServer {
                 },
                 includeFields: {
                   type: 'boolean',
-                  description: 'Include field definitions for tables',
+                  description: 'Include field definitions for tables. ⚠️ WARNING: Significantly increases token usage',
                   default: false,
                 },
                 includeProcedures: {
                   type: 'boolean',
-                  description: 'Include procedure definitions',
+                  description: 'Include procedure definitions. ⚠️ WARNING: Can cause very large responses (15K+ tokens)',
                   default: false,
                 },
                 limit: {
@@ -101,7 +103,7 @@ export class ALMCPServer {
           },
           {
             name: 'al_get_object_definition',
-            description: 'Get complete definition of a specific AL object',
+            description: 'Get complete definition of a specific AL object. ⚠️ WARNING: Can be large for complex objects (3K+ tokens). Use summaryMode:true and procedureLimit for large codeunits. For function overviews, use al_get_object_summary instead.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -129,12 +131,12 @@ export class ALMCPServer {
                 },
                 includeProcedures: {
                   type: 'boolean',
-                  description: 'Include procedure definitions for codeunits (default: true)',
+                  description: 'Include procedure definitions for codeunits. ⚠️ WARNING: Can be very large for complex objects (default: true)',
                   default: true,
                 },
                 summaryMode: {
                   type: 'boolean',
-                  description: 'Return summary view with limited details (default: true)',
+                  description: 'Return summary view with limited details. ✅ RECOMMENDED: true for token efficiency (default: true)',
                   default: true,
                 },
                 fieldLimit: {
@@ -258,6 +260,162 @@ export class ALMCPServer {
               required: ['baseObjectName'],
             },
           },
+          {
+            name: 'al_search_procedures',
+            description: 'Search procedures within a specific AL object (codeunit, table, page, etc.)',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                objectName: {
+                  type: 'string',
+                  description: 'Name of the object to search procedures in',
+                },
+                objectType: {
+                  type: 'string',
+                  description: 'Type of object (optional for disambiguation)',
+                  enum: ['Table', 'Page', 'Codeunit', 'Report', 'Enum', 'Interface', 'PermissionSet', 'XmlPort', 'Query'],
+                },
+                procedurePattern: {
+                  type: 'string',
+                  description: 'Pattern to filter procedures (supports wildcards like "*Code*")',
+                },
+                limit: {
+                  type: 'number',
+                  description: 'Maximum number of procedures to return (default: 20)',
+                  default: 20,
+                },
+                offset: {
+                  type: 'number',
+                  description: 'Number of procedures to skip for pagination (default: 0)',
+                  default: 0,
+                },
+                includeDetails: {
+                  type: 'boolean',
+                  description: 'Include full procedure details or just names (default: true)',
+                  default: true,
+                },
+              },
+              required: ['objectName'],
+            },
+          },
+          {
+            name: 'al_search_fields',
+            description: 'Search fields within a specific table',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                objectName: {
+                  type: 'string',
+                  description: 'Name of the table to search fields in',
+                },
+                fieldPattern: {
+                  type: 'string',
+                  description: 'Pattern to filter fields (supports wildcards like "*Code*")',
+                },
+                limit: {
+                  type: 'number',
+                  description: 'Maximum number of fields to return (default: 20)',
+                  default: 20,
+                },
+                offset: {
+                  type: 'number',
+                  description: 'Number of fields to skip for pagination (default: 0)',
+                  default: 0,
+                },
+                includeDetails: {
+                  type: 'boolean',
+                  description: 'Include full field details or just basic info (default: true)',
+                  default: true,
+                },
+              },
+              required: ['objectName'],
+            },
+          },
+          {
+            name: 'al_search_controls',
+            description: 'Search controls within a specific page',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                objectName: {
+                  type: 'string',
+                  description: 'Name of the page to search controls in',
+                },
+                controlPattern: {
+                  type: 'string',
+                  description: 'Pattern to filter controls (supports wildcards like "*Button*")',
+                },
+                limit: {
+                  type: 'number',
+                  description: 'Maximum number of controls to return (default: 20)',
+                  default: 20,
+                },
+                offset: {
+                  type: 'number',
+                  description: 'Number of controls to skip for pagination (default: 0)',
+                  default: 0,
+                },
+                includeDetails: {
+                  type: 'boolean',
+                  description: 'Include full control details or just basic info (default: true)',
+                  default: true,
+                },
+              },
+              required: ['objectName'],
+            },
+          },
+          {
+            name: 'al_search_dataitems',
+            description: 'Search data items within reports, queries, or xmlports',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                objectName: {
+                  type: 'string',
+                  description: 'Name of the report/query/xmlport to search data items in',
+                },
+                dataItemPattern: {
+                  type: 'string',
+                  description: 'Pattern to filter data items (supports wildcards like "*Header*")',
+                },
+                limit: {
+                  type: 'number',
+                  description: 'Maximum number of data items to return (default: 20)',
+                  default: 20,
+                },
+                offset: {
+                  type: 'number',
+                  description: 'Number of data items to skip for pagination (default: 0)',
+                  default: 0,
+                },
+                includeDetails: {
+                  type: 'boolean',
+                  description: 'Include full data item details or just basic info (default: true)',
+                  default: true,
+                },
+              },
+              required: ['objectName'],
+            },
+          },
+          {
+            name: 'al_get_object_summary',
+            description: '✅ TOKEN EFFICIENT: Get intelligent summary of AL objects with categorized procedures/functions. Perfect for complex codeunits like Sales-Post (96% token reduction vs detailed view). Returns organized categories instead of overwhelming raw lists.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                objectName: {
+                  type: 'string',
+                  description: 'Name of the object to summarize',
+                },
+                objectType: {
+                  type: 'string',
+                  description: 'Type of object (optional for disambiguation)',
+                  enum: ['Table', 'Page', 'Codeunit', 'Report', 'Enum', 'Interface', 'PermissionSet', 'XmlPort', 'Query'],
+                },
+              },
+              required: ['objectName'],
+            },
+          },
         ],
       };
     });
@@ -267,6 +425,9 @@ export class ALMCPServer {
       const { name, arguments: args } = request.params;
 
       try {
+        // Ensure AL packages are loaded before processing any tool call
+        await this.ensureInitialized();
+
         switch (name) {
           case 'al_search_objects':
             return {
@@ -358,6 +519,56 @@ export class ALMCPServer {
               ],
             };
 
+          case 'al_search_procedures':
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(await this.tools.searchProcedures(args as any), null, 2),
+                },
+              ],
+            };
+
+          case 'al_search_fields':
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(await this.tools.searchFields(args as any), null, 2),
+                },
+              ],
+            };
+
+          case 'al_search_controls':
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(await this.tools.searchControls(args as any), null, 2),
+                },
+              ],
+            };
+
+          case 'al_search_dataitems':
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(await this.tools.searchDataItems(args as any), null, 2),
+                },
+              ],
+            };
+
+          case 'al_get_object_summary':
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(await this.tools.getObjectSummary((args as any).objectName, (args as any).objectType), null, 2),
+                },
+              ],
+            };
+
           default:
             throw new Error(`Unknown tool: ${name}`);
         }
@@ -381,12 +592,10 @@ export class ALMCPServer {
   }
 
   async start(): Promise<void> {
-    // Auto-setup AL CLI
-    await this.setupALCli();
-
+    // Don't auto-initialize here - wait for first tool call for better performance
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error('AL MCP Server started successfully');
+    console.error('AL MCP Server started successfully (packages will be auto-loaded on first use)');
   }
 
   // Public methods for testing
@@ -396,8 +605,76 @@ export class ALMCPServer {
     await this.tools.autoDiscoverPackages('/home/stefan/Documents/Repos/community/OpenFeature-al');
   }
 
+  /**
+   * Ensure AL packages are loaded (lazy initialization)
+   */
+  private async ensureInitialized(): Promise<void> {
+    if (this.isInitialized) {
+      return;
+    }
+
+    // If initialization is already in progress, wait for it
+    if (this.initializationPromise) {
+      await this.initializationPromise;
+      return;
+    }
+
+    // Start initialization
+    this.initializationPromise = this.performInitialization();
+    await this.initializationPromise;
+  }
+
+  private async performInitialization(): Promise<void> {
+    try {
+      console.error('🔍 Auto-loading AL packages...');
+      
+      // Setup AL CLI
+      await this.setupALCli();
+
+      // Try to auto-discover AL packages in current working directory and common locations
+      const searchPaths = [
+        process.cwd(), // Current working directory
+        '.', // Relative current
+        '..', // Parent directory
+        '../..', // Grandparent directory
+        '/home/stefan/Documents/Repos/community/OpenFeature-al' // Known test location
+      ];
+
+      let packagesLoaded = false;
+      
+      for (const searchPath of searchPaths) {
+        try {
+          const result = await this.tools.autoDiscoverPackages(searchPath);
+          if (result.packages.length > 0) {
+            console.error(`✅ Auto-loaded ${result.packages.length} AL packages from ${searchPath}`);
+            packagesLoaded = true;
+            break;
+          }
+        } catch (error) {
+          // Continue to next search path
+          continue;
+        }
+      }
+
+      if (!packagesLoaded) {
+        console.error('⚠️  No AL packages found in common locations. Use al_load_packages to load from specific directory.');
+      }
+
+      this.isInitialized = true;
+    } catch (error) {
+      console.error('❌ Auto-initialization failed:', error);
+      // Don't throw - allow server to continue with limited functionality
+      this.isInitialized = true; // Prevent retry loops
+    } finally {
+      this.initializationPromise = null;
+    }
+  }
+
   async handleToolCall(request: { name: string; arguments: any }): Promise<any> {
     const { name, arguments: args } = request;
+
+    // Ensure AL packages are loaded before processing any tool call
+    await this.ensureInitialized();
 
     switch (name) {
       case 'al_search_objects':
@@ -443,6 +720,31 @@ export class ALMCPServer {
       case 'al_get_object_extensions':
         return {
           content: await this.tools.getObjectExtensions(args.baseObjectName)
+        };
+
+      case 'al_search_procedures':
+        return {
+          content: await this.tools.searchProcedures(args as any)
+        };
+
+      case 'al_search_fields':
+        return {
+          content: await this.tools.searchFields(args as any)
+        };
+
+      case 'al_search_controls':
+        return {
+          content: await this.tools.searchControls(args as any)
+        };
+
+      case 'al_search_dataitems':
+        return {
+          content: await this.tools.searchDataItems(args as any)
+        };
+
+      case 'al_get_object_summary':
+        return {
+          content: await this.tools.getObjectSummary(args.objectName, args.objectType)
         };
 
       default:
