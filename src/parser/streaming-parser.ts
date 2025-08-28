@@ -270,8 +270,9 @@ export class StreamingSymbolParser {
 
     if (data.Keys) {
       table.Keys = data.Keys.map((keyData: any) => ({
-        Fields: keyData.Fields || [],
-        Properties: this.parseProperties(keyData.Properties)
+        Fields: keyData.FieldNames || keyData.Fields || [],
+        Properties: this.parseProperties(keyData.Properties),
+        Name: keyData.Name
       }));
     }
 

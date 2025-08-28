@@ -73,6 +73,7 @@ export interface ALField {
 export interface ALKey {
   Fields: string[];
   Properties: ALProperty[];
+  Name?: string;
 }
 
 export interface ALControl {
