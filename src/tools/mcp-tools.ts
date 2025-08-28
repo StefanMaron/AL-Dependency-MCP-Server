@@ -3,11 +3,19 @@ import {
   GetObjectDefinitionArgs, 
   FindReferencesArgs,
   LoadPackagesArgs,
+  SearchProceduresArgs,
+  SearchFieldsArgs,
+  SearchControlsArgs,
+  SearchDataItemsArgs,
   SearchObjectsResult,
   GetObjectDefinitionResult,
   FindReferencesResult,
   LoadPackagesResult,
-  ListPackagesResult
+  ListPackagesResult,
+  SearchProceduresResult,
+  SearchFieldsResult,
+  SearchControlsResult,
+  SearchDataItemsResult
 } from '../types/mcp-types';
 import { ALObjectDefinition } from '../types/al-types';
 import { OptimizedSymbolDatabase } from '../core/symbol-database';
@@ -402,6 +410,426 @@ export class ALMCPTools {
       };
     } catch (error) {
       throw new Error(`Get object extensions failed: ${error}`);
+    }
+  }
+
+  /**
+   * Search procedures within a specific object
+   */
+  async searchProcedures(args: SearchProceduresArgs): Promise<SearchProceduresResult> {
+    const startTime = Date.now();
+    
+    try {
+      const limit = args.limit || 20;
+      const offset = args.offset || 0;
+      const includeDetails = args.includeDetails !== false;
+      
+      // Find the object first
+      const objects = this.database.searchObjects(args.objectName, args.objectType);
+      const targetObject = objects.find(obj => obj.Name === args.objectName);
+      
+      if (!targetObject) {
+        throw new Error(`Object not found: ${args.objectName}`);
+      }
+
+      // Get all procedures for the object
+      let allProcedures = this.database.getObjectProcedures(targetObject.Name);
+      
+      // Filter by pattern if provided
+      if (args.procedurePattern) {
+        const pattern = args.procedurePattern.toLowerCase();
+        const isWildcard = pattern.includes('*');
+        
+        if (isWildcard) {
+          const regex = new RegExp(pattern.replace(/\*/g, '.*'));
+          allProcedures = allProcedures.filter(proc => 
+            regex.test(proc.Name.toLowerCase())
+          );
+        } else {
+          allProcedures = allProcedures.filter(proc => 
+            proc.Name.toLowerCase().includes(pattern)
+          );
+        }
+      }
+
+      // Apply pagination
+      const totalFound = allProcedures.length;
+      const paginatedProcedures = allProcedures.slice(offset, offset + limit);
+
+      // Optionally strip details to save tokens
+      const procedures = paginatedProcedures.map(proc => {
+        if (!includeDetails) {
+          // Return minimal info
+          return {
+            Name: proc.Name
+          };
+        }
+        return proc;
+      });
+
+      const executionTime = Date.now() - startTime;
+
+      return {
+        objectName: args.objectName,
+        objectType: targetObject.Type,
+        procedures,
+        totalFound,
+        returned: procedures.length,
+        offset,
+        limit,
+        hasMore: offset + limit < totalFound,
+        executionTimeMs: executionTime
+      };
+    } catch (error) {
+      throw new Error(`Search procedures failed: ${error}`);
+    }
+  }
+
+  /**
+   * Search fields within a specific table
+   */
+  async searchFields(args: SearchFieldsArgs): Promise<SearchFieldsResult> {
+    const startTime = Date.now();
+    
+    try {
+      const limit = args.limit || 20;
+      const offset = args.offset || 0;
+      const includeDetails = args.includeDetails !== false;
+      
+      // Find the table
+      const objects = this.database.searchObjects(args.objectName, 'Table');
+      const targetTable = objects.find(obj => obj.Name === args.objectName);
+      
+      if (!targetTable) {
+        throw new Error(`Table not found: ${args.objectName}`);
+      }
+
+      // Get all fields for the table
+      let allFields = this.database.getTableFields(targetTable.Name);
+      
+      // Filter by pattern if provided
+      if (args.fieldPattern) {
+        const pattern = args.fieldPattern.toLowerCase();
+        const isWildcard = pattern.includes('*');
+        
+        if (isWildcard) {
+          const regex = new RegExp(pattern.replace(/\*/g, '.*'));
+          allFields = allFields.filter(field => 
+            regex.test(field.Name.toLowerCase())
+          );
+        } else {
+          allFields = allFields.filter(field => 
+            field.Name.toLowerCase().includes(pattern)
+          );
+        }
+      }
+
+      // Apply pagination
+      const totalFound = allFields.length;
+      const paginatedFields = allFields.slice(offset, offset + limit);
+
+      // Optionally strip details to save tokens
+      const fields = paginatedFields.map(field => {
+        if (!includeDetails) {
+          // Return minimal info
+          return {
+            Id: field.Id,
+            Name: field.Name,
+            TypeDefinition: field.TypeDefinition
+          };
+        }
+        return field;
+      });
+
+      const executionTime = Date.now() - startTime;
+
+      return {
+        objectName: args.objectName,
+        fields,
+        totalFound,
+        returned: fields.length,
+        offset,
+        limit,
+        hasMore: offset + limit < totalFound,
+        executionTimeMs: executionTime
+      };
+    } catch (error) {
+      throw new Error(`Search fields failed: ${error}`);
+    }
+  }
+
+  /**
+   * Search controls within a specific page
+   */
+  async searchControls(args: SearchControlsArgs): Promise<SearchControlsResult> {
+    const startTime = Date.now();
+    
+    try {
+      const limit = args.limit || 20;
+      const offset = args.offset || 0;
+      const includeDetails = args.includeDetails !== false;
+      
+      // Find the page
+      const objects = this.database.searchObjects(args.objectName, 'Page');
+      const targetPage = objects.find(obj => obj.Name === args.objectName);
+      
+      if (!targetPage) {
+        throw new Error(`Page not found: ${args.objectName}`);
+      }
+
+      // Get all controls for the page
+      let allControls = this.database.getPageControls(targetPage.Name);
+      
+      // Filter by pattern if provided
+      if (args.controlPattern) {
+        const pattern = args.controlPattern.toLowerCase();
+        const isWildcard = pattern.includes('*');
+        
+        if (isWildcard) {
+          const regex = new RegExp(pattern.replace(/\*/g, '.*'));
+          allControls = allControls.filter(control => 
+            control.Name && regex.test(control.Name.toLowerCase())
+          );
+        } else {
+          allControls = allControls.filter(control => 
+            control.Name && control.Name.toLowerCase().includes(pattern)
+          );
+        }
+      }
+
+      // Apply pagination
+      const totalFound = allControls.length;
+      const paginatedControls = allControls.slice(offset, offset + limit);
+
+      // Optionally strip details to save tokens
+      const controls = paginatedControls.map(control => {
+        if (!includeDetails) {
+          // Return minimal info
+          return {
+            Name: control.Name,
+            Type: control.Type || control.ControlType
+          };
+        }
+        return control;
+      });
+
+      const executionTime = Date.now() - startTime;
+
+      return {
+        objectName: args.objectName,
+        objectType: 'Page',
+        controls,
+        totalFound,
+        returned: controls.length,
+        offset,
+        limit,
+        hasMore: offset + limit < totalFound,
+        executionTimeMs: executionTime
+      };
+    } catch (error) {
+      throw new Error(`Search controls failed: ${error}`);
+    }
+  }
+
+  /**
+   * Search data items within reports, queries, or xmlports
+   */
+  async searchDataItems(args: SearchDataItemsArgs): Promise<SearchDataItemsResult> {
+    const startTime = Date.now();
+    
+    try {
+      const limit = args.limit || 20;
+      const offset = args.offset || 0;
+      const includeDetails = args.includeDetails !== false;
+      
+      // Find the object (Report, Query, or XmlPort)
+      const objects = this.database.searchObjects(args.objectName);
+      const targetObject = objects.find(obj => 
+        obj.Name === args.objectName && 
+        ['Report', 'Query', 'XmlPort'].includes(obj.Type)
+      );
+      
+      if (!targetObject) {
+        throw new Error(`Report/Query/XmlPort not found: ${args.objectName}`);
+      }
+
+      // Get all data items for the object
+      let allDataItems = this.database.getDataItems(targetObject.Name);
+      
+      // Filter by pattern if provided
+      if (args.dataItemPattern) {
+        const pattern = args.dataItemPattern.toLowerCase();
+        const isWildcard = pattern.includes('*');
+        
+        if (isWildcard) {
+          const regex = new RegExp(pattern.replace(/\*/g, '.*'));
+          allDataItems = allDataItems.filter(item => 
+            item.Name && regex.test(item.Name.toLowerCase())
+          );
+        } else {
+          allDataItems = allDataItems.filter(item => 
+            item.Name && item.Name.toLowerCase().includes(pattern)
+          );
+        }
+      }
+
+      // Apply pagination
+      const totalFound = allDataItems.length;
+      const paginatedItems = allDataItems.slice(offset, offset + limit);
+
+      // Optionally strip details to save tokens
+      const dataItems = paginatedItems.map(item => {
+        if (!includeDetails) {
+          // Return minimal info
+          return {
+            Name: item.Name,
+            DataItemTable: item.DataItemTable || item.SourceTable,
+            NodeType: item.NodeType
+          };
+        }
+        return item;
+      });
+
+      const executionTime = Date.now() - startTime;
+
+      return {
+        objectName: args.objectName,
+        objectType: targetObject.Type,
+        dataItems,
+        totalFound,
+        returned: dataItems.length,
+        offset,
+        limit,
+        hasMore: offset + limit < totalFound,
+        executionTimeMs: executionTime
+      };
+    } catch (error) {
+      throw new Error(`Search data items failed: ${error}`);
+    }
+  }
+
+  /**
+   * Get intelligent summary of an object with smart procedure categorization
+   */
+  async getObjectSummary(objectName: string, objectType?: string): Promise<{
+    object: any;
+    summary: {
+      name: string;
+      type: string;
+      totalProcedures: number;
+      procedureCategories: {
+        [category: string]: {
+          count: number;
+          examples: string[];
+        };
+      };
+      keyProcedures: string[];
+      description: string;
+    };
+    executionTimeMs: number;
+  }> {
+    const startTime = Date.now();
+
+    try {
+      // Find the object
+      const objects = this.database.searchObjects(objectName, objectType);
+      const targetObject = objects.find(obj => obj.Name === objectName);
+      
+      if (!targetObject) {
+        throw new Error(`Object not found: ${objectName}`);
+      }
+
+      // Get procedures
+      const allProcedures = this.database.getObjectProcedures(targetObject.Name);
+      
+      // Categorize procedures intelligently
+      const categories: { [key: string]: { count: number; examples: string[] } } = {};
+      const keyProcedures: string[] = [];
+
+      // Define procedure categories based on naming patterns
+      const categoryPatterns = {
+        'Main Entry Points': /^(Run|Execute|Process|Main|Start)/i,
+        'Validation & Checks': /^(Check|Validate|Test|Verify|Ensure)/i,
+        'Posting Operations': /^(Post|Create|Insert|Update|Delete|Modify)/i,
+        'Data Processing': /^(Fill|Refresh|Reset|Copy|Transfer|Calculate|Build)/i,
+        'Event Handlers': /^(On[A-Z]|Before|After)/i,
+        'Getters & Utilities': /^(Get|Find|Lookup|Set|Init)/i,
+        'Error Handling': /^(Error|Exception|Handle|Raise)/i
+      };
+
+      // Categorize each procedure
+      for (const proc of allProcedures) {
+        let categorized = false;
+        
+        for (const [categoryName, pattern] of Object.entries(categoryPatterns)) {
+          if (pattern.test(proc.Name)) {
+            if (!categories[categoryName]) {
+              categories[categoryName] = { count: 0, examples: [] };
+            }
+            categories[categoryName].count++;
+            
+            // Add to examples (max 5 per category)
+            if (categories[categoryName].examples.length < 5) {
+              categories[categoryName].examples.push(proc.Name);
+            }
+            categorized = true;
+            break;
+          }
+        }
+
+        // If not categorized, put in "Other"
+        if (!categorized) {
+          if (!categories['Other Functions']) {
+            categories['Other Functions'] = { count: 0, examples: [] };
+          }
+          categories['Other Functions'].count++;
+          if (categories['Other Functions'].examples.length < 3) {
+            categories['Other Functions'].examples.push(proc.Name);
+          }
+        }
+
+        // Identify key procedures (likely entry points)
+        if (/^(Run|Execute|Process|Main|Check.*Document|Post.*Line)$/i.test(proc.Name)) {
+          keyProcedures.push(proc.Name);
+        }
+      }
+
+      // Generate intelligent description
+      let description = `The ${targetObject.Name} ${targetObject.Type.toLowerCase()}`;
+      if (targetObject.Type === 'Codeunit') {
+        description += ` has ${allProcedures.length} procedures covering`;
+        const topCategories = Object.entries(categories)
+          .sort(([,a], [,b]) => b.count - a.count)
+          .slice(0, 3)
+          .map(([name]) => name.toLowerCase());
+        description += ` ${topCategories.join(', ')}`;
+        
+        if (targetObject.Name.includes('Post')) {
+          description += ', focused on posting operations';
+        }
+      }
+
+      const executionTime = Date.now() - startTime;
+
+      return {
+        object: {
+          Name: targetObject.Name,
+          Type: targetObject.Type,
+          Id: targetObject.Id,
+          PackageName: targetObject.PackageName
+        },
+        summary: {
+          name: targetObject.Name,
+          type: targetObject.Type,
+          totalProcedures: allProcedures.length,
+          procedureCategories: categories,
+          keyProcedures: keyProcedures.slice(0, 10), // Max 10 key procedures
+          description
+        },
+        executionTimeMs: executionTime
+      };
+    } catch (error) {
+      throw new Error(`Get object summary failed: ${error}`);
     }
   }
 }
