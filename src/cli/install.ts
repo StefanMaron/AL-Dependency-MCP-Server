@@ -56,12 +56,15 @@ class ALMCPInstaller {
       await this.runCommand('AL', ['--version']);
       console.log('✅ AL CLI tools found');
     } catch {
-      console.log('⚠️  AL CLI tools not found. Installing...');
+      console.log('⚠️  AL CLI tools not found. Trying to install...');
       try {
         await this.runCommand('dotnet', ['tool', 'install', '--global', 'Microsoft.Dynamics.AL.Tools']);
         console.log('✅ AL CLI tools installed');
       } catch (error) {
-        throw new Error('Failed to install AL CLI tools. Please install manually: dotnet tool install --global Microsoft.Dynamics.AL.Tools');
+        console.log('⚠️  Could not install AL CLI tools automatically');
+        console.log('📝 The MCP server can still work with existing .alpackages');
+        console.log('💡 To extract symbols from .app files, install manually:');
+        console.log('   dotnet tool install --global Microsoft.Dynamics.AL.Tools');
       }
     }
   }
