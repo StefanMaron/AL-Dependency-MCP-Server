@@ -2,7 +2,21 @@
 
 **Model Context Protocol (MCP) server providing intelligent AL (Application Language) code assistance for Microsoft Dynamics 365 Business Central development.**
 
-## 🚀 Installation for Coding Assistants
+## 🚀 Quick Installation
+
+### One-Command Install (Recommended)
+
+```bash
+npx al-mcp-server
+```
+
+This single command will:
+- ✅ Install AL CLI tools (if not present)
+- ✅ Configure Claude Code automatically
+- ✅ Configure VS Code MCP settings
+- ✅ Show manual configuration for other editors
+
+### Manual Installation for Coding Assistants
 
 ### Claude Code (VS Code Extension)
 
@@ -30,14 +44,36 @@
 }
 ```
 
-### GitHub Copilot (VS Code)
+### GitHub Copilot (VS Code) - MCP Server Support
 
-GitHub Copilot doesn't directly support MCP servers, but you can enhance your AL development by:
+GitHub Copilot now supports MCP servers! Configure the AL MCP Server for enhanced AL development:
 
-1. **Install this MCP server** following the setup below
-2. **Use Claude Code alongside Copilot** for the best experience:
-   - Copilot for general code completion
-   - Claude Code + AL MCP for AL-specific insights and business logic assistance
+**Option 1: Workspace Configuration (Recommended)**
+1. **Create `.vscode/mcp.json`** in your AL project root:
+```json
+{
+  "servers": {
+    "al": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["/absolute/path/to/al-mcp-server/dist/index.js"]
+    }
+  }
+}
+```
+
+**Option 2: User Profile Configuration**
+1. **Create `mcp.json`** in your user profile directory
+2. **Add the AL server configuration** (same JSON format as above)
+
+**Option 3: Dev Container Configuration**
+- Add MCP server configuration to your `devcontainer.json`
+- Servers will be available in containerized development environments
+
+**Usage with GitHub Copilot:**
+- Enable agent mode in Copilot Chat
+- Select available AL tools from the MCP server
+- Copilot will use AL-specific context for better code assistance
 
 ### Cursor IDE
 
@@ -84,12 +120,14 @@ GitHub Copilot doesn't directly support MCP servers, but you can enhance your AL
 }
 ```
 
-### Universal Setup Steps (All Assistants)
+### Universal Setup Steps (Manual Installation)
+
+If you prefer manual installation or the automatic installer didn't work:
 
 1. **Clone and build** this repository:
 ```bash
-git clone <repository-url>
-cd al-mcp-server
+git clone https://github.com/StefanMaron/AL-Dependency-MCP-Server.git
+cd AL-Dependency-MCP-Server
 npm install
 npm run build
 ```
@@ -471,6 +509,44 @@ npm run clean && npm run build
 
 # Start production build
 npm start
+```
+
+## 📦 Publishing (Maintainers)
+
+This package uses GitHub Actions for automated publishing to npm.
+
+### Setup (One-time)
+
+1. **Create npm token**:
+   - Go to [npmjs.com](https://www.npmjs.com) → Access Tokens → Generate New Token
+   - Choose "Automation" type for CI/CD
+
+2. **Add to GitHub secrets**:
+   - Go to repository Settings → Secrets and variables → Actions
+   - Add `NPM_TOKEN` with your npm token
+
+### Publishing Methods
+
+**Method 1: Manual Workflow Dispatch (Recommended)**
+1. Go to repository → Actions → "Publish to npm"
+2. Click "Run workflow"
+3. Choose version bump: patch/minor/major
+4. Workflow will automatically:
+   - Run tests
+   - Bump version
+   - Publish to npm
+   - Create GitHub release
+   - Push version tag
+
+**Method 2: GitHub Releases**
+1. Create a new release with tag format `v1.2.3`
+2. Workflow triggers automatically and publishes to npm
+
+### Local Publishing (Fallback)
+```bash
+npm run build
+npm version patch  # or minor/major
+npm publish
 ```
 
 ## 🤝 Contributing

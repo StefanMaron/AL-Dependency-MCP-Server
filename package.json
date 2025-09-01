@@ -1,8 +1,16 @@
 {
   "name": "al-mcp-server",
   "version": "1.0.0",
-  "description": "**Model Context Protocol (MCP) server providing intelligent AL (Application Language) code assistance for Microsoft Dynamics 365 Business Central development.**",
-  "main": "index.js",
+  "description": "Model Context Protocol (MCP) server providing intelligent AL (Application Language) code assistance for Microsoft Dynamics 365 Business Central development.",
+  "main": "dist/index.js",
+  "bin": {
+    "al-mcp-server": "dist/cli/install.js"
+  },
+  "files": [
+    "dist/**/*",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc",
     "dev": "ts-node src/index.ts",
@@ -10,14 +18,35 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "lint": "echo 'Linting skipped - no linter configured'",
     "clean": "rm -rf dist",
     "setup": "npm run build && node -e \"require('./dist/cli/al-installer.js').ALInstaller.prototype.ensureALAvailable().then(console.log)\"",
     "install-al": "dotnet tool install --global Microsoft.Dynamics.AL.Tools",
-    "check-al": "AL --version"
+    "check-al": "AL --version",
+    "prepublishOnly": "npm run clean && npm run build",
+    "postversion": "git push && git push --tags"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "al",
+    "dynamics",
+    "business-central",
+    "mcp",
+    "model-context-protocol",
+    "ai",
+    "coding-assistant",
+    "claude",
+    "copilot"
+  ],
+  "author": "Stefan Maron",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/StefanMaron/AL-Dependency-MCP-Server.git"
+  },
+  "homepage": "https://github.com/StefanMaron/AL-Dependency-MCP-Server#readme",
+  "bugs": {
+    "url": "https://github.com/StefanMaron/AL-Dependency-MCP-Server/issues"
+  },
   "type": "commonjs",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.4",
