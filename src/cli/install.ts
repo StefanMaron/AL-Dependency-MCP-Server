@@ -20,8 +20,15 @@ interface VSCodeMCPConfig {
 class ALMCPInstaller {
   private readonly serverPath: string;
   private readonly serverName = 'al';
+  private readonly useNpx: boolean;
 
   constructor() {
+    // Check if running via npx - look for the package name in the path
+    // When users run 'npx al-mcp-server', the path will contain the package name
+    this.useNpx = process.cwd().includes('_npx') || 
+                  __dirname.includes('al-mcp-server') ||
+                  process.env.npm_command === 'exec';
+    
     // Get the absolute path to this package's server
     this.serverPath = path.resolve(__dirname, '../index.js');
   }
@@ -56,12 +63,15 @@ class ALMCPInstaller {
       await this.runCommand('AL', ['--version']);
       console.log('✅ AL CLI tools found');
     } catch {
-      console.log('⚠️  AL CLI tools not found. Installing...');
+      console.log('⚠️  AL CLI tools not found. Trying to install...');
       try {
         await this.runCommand('dotnet', ['tool', 'install', '--global', 'Microsoft.Dynamics.AL.Tools']);
         console.log('✅ AL CLI tools installed');
       } catch (error) {
-        throw new Error('Failed to install AL CLI tools. Please install manually: dotnet tool install --global Microsoft.Dynamics.AL.Tools');
+        console.log('⚠️  Could not install AL CLI tools automatically');
+        console.log('📝 The MCP server can still work with existing .alpackages');
+        console.log('💡 To extract symbols from .app files, install manually:');
+        console.log('   dotnet tool install --global Microsoft.Dynamics.AL.Tools');
       }
     }
   }
@@ -86,7 +96,10 @@ class ALMCPInstaller {
         settings['claude.mcpServers'] = {};
       }
 
-      settings['claude.mcpServers'][this.serverName] = {
+      settings['claude.mcpServers'][this.serverName] = this.useNpx ? {
+        command: 'npx',
+        args: ['al-mcp-server']
+      } : {
         command: 'node',
         args: [this.serverPath]
       };
@@ -121,7 +134,11 @@ class ALMCPInstaller {
         mcpConfig = JSON.parse(content);
       }
 
-      mcpConfig.servers[this.serverName] = {
+      mcpConfig.servers[this.serverName] = this.useNpx ? {
+        type: 'stdio',
+        command: 'npx',
+        args: ['al-mcp-server']
+      } : {
         type: 'stdio',
         command: 'node',
         args: [this.serverPath]
@@ -200,20 +217,31 @@ class ALMCPInstaller {
     console.log('\n📖 Manual Configuration Instructions:');
     console.log('=====================================\n');
     
-    console.log('🔷 Claude Code (VS Code Extension):');
-    console.log('Add to VS Code settings.json:');
-    console.log(JSON.stringify({
+    const claudeConfig = this.useNpx ? {
+      "claude.mcpServers": {
+        [this.serverName]: {
+          command: 'npx',
+          args: ['al-mcp-server']
+        }
+      }
+    } : {
       "claude.mcpServers": {
         [this.serverName]: {
           command: 'node',
           args: [this.serverPath]
         }
       }
-    }, null, 2));
+    };
 
-    console.log('\n🔷 GitHub Copilot (VS Code):');
-    console.log('Create .vscode/mcp.json in your workspace:');
-    console.log(JSON.stringify({
+    const vsCodeConfig = this.useNpx ? {
+      servers: {
+        [this.serverName]: {
+          type: 'stdio',
+          command: 'npx',
+          args: ['al-mcp-server']
+        }
+      }
+    } : {
       servers: {
         [this.serverName]: {
           type: 'stdio',
@@ -221,11 +249,24 @@ class ALMCPInstaller {
           args: [this.serverPath]
         }
       }
-    }, null, 2));
+    };
+
+    console.log('🔷 Claude Code (VS Code Extension):');
+    console.log('Add to VS Code settings.json:');
+    console.log(JSON.stringify(claudeConfig, null, 2));
+
+    console.log('\n🔷 GitHub Copilot (VS Code):');
+    console.log('Create .vscode/mcp.json in your workspace:');
+    console.log(JSON.stringify(vsCodeConfig, null, 2));
 
     console.log('\n🔷 Other Editors:');
-    console.log(`Server command: node`);
-    console.log(`Server args: ["${this.serverPath}"]`);
+    if (this.useNpx) {
+      console.log(`Server command: npx`);
+      console.log(`Server args: ["al-mcp-server"]`);
+    } else {
+      console.log(`Server command: node`);
+      console.log(`Server args: ["${this.serverPath}"]`);
+    }
   }
 
   private runCommand(command: string, args: string[]): Promise<string> {
@@ -261,11 +302,24 @@ class ALMCPInstaller {
   }
 }
 
+// Check if being used as MCP server (stdin is not a TTY)
+function isRunningAsMCPServer(): boolean {
+  return !process.stdin.isTTY && !process.stdout.isTTY;
+}
+
 // Run installer if this file is executed directly
 if (require.main === module) {
   const args = process.argv.slice(2);
   
-  if (args.includes('--help') || args.includes('-h')) {
+  // If running as MCP server (non-interactive), start the actual server
+  if (isRunningAsMCPServer() && !args.includes('--help') && !args.includes('--version')) {
+    // Import and start the MCP server
+    const { main } = require('../index');
+    main().catch((error: Error) => {
+      console.error('Failed to start AL MCP Server:', error);
+      process.exit(1);
+    });
+  } else if (args.includes('--help') || args.includes('-h')) {
     console.log(`
 🚀 AL MCP Server Installer
 
@@ -280,27 +334,26 @@ Examples:
   npx al-mcp-server           # Install and configure
   npx al-mcp-server --help    # Show help
   npx al-mcp-server --ci      # CI mode (skip installation)
+
+Note: When run via MCP protocol (stdin/stdout), automatically starts the server.
 `);
     process.exit(0);
-  }
-  
-  if (args.includes('--version') || args.includes('-v')) {
+  } else if (args.includes('--version') || args.includes('-v')) {
     const pkg = require('../../package.json');
     console.log(`al-mcp-server v${pkg.version}`);
     process.exit(0);
-  }
-  
-  if (args.includes('--ci') || process.env.CI === 'true') {
+  } else if (args.includes('--ci') || process.env.CI === 'true') {
     console.log('🤖 CI mode detected - skipping installation');
     console.log('✅ AL MCP Server build verification successful');
     process.exit(0);
+  } else {
+    // Default: run installer
+    const installer = new ALMCPInstaller();
+    installer.install().catch((error) => {
+      console.error(error);
+      process.exit(1);
+    });
   }
-  
-  const installer = new ALMCPInstaller();
-  installer.install().catch((error) => {
-    console.error(error);
-    process.exit(1);
-  });
 }
 
 export { ALMCPInstaller };
