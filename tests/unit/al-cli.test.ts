@@ -130,6 +130,8 @@ describe('ALCliWrapper', () => {
         }
       });
 
+      mockSpawn.mockReturnValue(mockProcess);
+
       const symbolPath = await alCli.extractSymbols(testAppPath);
       
       expect(symbolPath).toMatch(/symbols_\d+_\w+\.app$/);
