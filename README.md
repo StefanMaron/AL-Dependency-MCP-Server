@@ -30,11 +30,10 @@ The AL MCP Server enables AI coding assistants to understand and work with AL co
 ## Prerequisites
 
 - **Node.js** 18 or higher
-- **AL packages** - .alpackages directory with symbol files in your AL workspace
+- **.NET SDK** (for AL CLI tools)
+- **AL packages** - Either .alpackages directory with symbol files or ability to extract them
 
-**Optional:**
-- **.NET SDK** + AL CLI tools - Only needed if you want to extract symbols from .app files
-- The MCP server works great with existing .alpackages (most common scenario)
+The installer will automatically check for and install AL CLI tools if needed.
 
 ## Adding AL MCP Server to Your AI Assistant
 
@@ -61,7 +60,7 @@ Configure your AI assistant to use the AL MCP Server. The server will be automat
 **Option 3: Via Command Line**
 ```bash
 # Add AL MCP server to Claude Code
-claude-code mcp add al npx al-mcp-server
+claude mcp add al-mcp-server -- npx al-mcp-server
 ```
 
 ### GitHub Copilot (VS Code)
