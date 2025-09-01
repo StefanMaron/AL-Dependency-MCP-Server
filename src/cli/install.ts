@@ -157,9 +157,32 @@ class ALMCPInstaller {
     let currentDir = process.cwd();
     
     while (currentDir !== path.dirname(currentDir)) {
-      // Check for common workspace indicators
-      const indicators = ['.git', '.vscode', 'app.json', 'launch.json'];
-      
+      // Check for AL-specific indicators first
+      const appJsonPath = path.join(currentDir, 'app.json');
+      if (fs.existsSync(appJsonPath)) {
+        try {
+          const appJsonContent = fs.readFileSync(appJsonPath, 'utf8');
+          const appJson = JSON.parse(appJsonContent);
+          if (typeof appJson === 'object' && (appJson.platform || appJson.application)) {
+            return currentDir;
+          }
+        } catch (e) {
+          // Ignore JSON parse errors and continue searching
+        }
+      }
+
+      // Check for at least one .al file in the directory
+      try {
+        const files = fs.readdirSync(currentDir);
+        if (files.some(file => file.endsWith('.al'))) {
+          return currentDir;
+        }
+      } catch (e) {
+        // Ignore directory read errors and continue searching
+      }
+
+      // Check for common workspace indicators as fallback
+      const indicators = ['.git', '.vscode', 'launch.json'];
       for (const indicator of indicators) {
         if (fs.existsSync(path.join(currentDir, indicator))) {
           return currentDir;
