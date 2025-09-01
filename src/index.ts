@@ -601,8 +601,8 @@ export class ALMCPServer {
   // Public methods for testing
   async initialize(): Promise<void> {
     await this.setupALCli();
-    // Auto-discover packages
-    await this.tools.autoDiscoverPackages('/home/stefan/Documents/Repos/community/OpenFeature-al');
+    // Auto-discover packages in current working directory
+    await this.tools.autoDiscoverPackages(process.cwd());
   }
 
   /**
@@ -631,13 +631,9 @@ export class ALMCPServer {
       // Setup AL CLI
       await this.setupALCli();
 
-      // Try to auto-discover AL packages in current working directory and common locations
+      // Try to auto-discover AL packages in current working directory only
       const searchPaths = [
-        process.cwd(), // Current working directory
-        '.', // Relative current
-        '..', // Parent directory
-        '../..', // Grandparent directory
-        '/home/stefan/Documents/Repos/community/OpenFeature-al' // Known test location
+        process.cwd() // Current working directory only
       ];
 
       let packagesLoaded = false;

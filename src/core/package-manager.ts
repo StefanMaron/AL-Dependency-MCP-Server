@@ -199,9 +199,39 @@ export class ALPackageManager {
   /**
    * Find .alpackages directories automatically
    */
-  async autoDiscoverPackageDirectories(rootPath: string): Promise<string[]> {
+  async autoDiscoverPackageDirectories(rootPath: string, maxDepth: number = 2): Promise<string[]> {
     const packageDirs: string[] = [];
     
+    // First, try to find .alpackages directories
+    await this.searchForAlPackagesDirectories(rootPath, packageDirs, maxDepth);
+    
+    // If no .alpackages found, check for custom AL packageCachePath settings
+    if (packageDirs.length === 0) {
+      const customPaths = await this.getCustomPackagePaths(rootPath);
+      for (const customPath of customPaths) {
+        try {
+          // Check if custom path exists and contains .app files
+          const stat = await fs.stat(customPath);
+          if (stat.isDirectory()) {
+            const appFiles = await this.discoverPackages({
+              packagesPath: customPath,
+              recursive: false
+            });
+            if (appFiles.length > 0) {
+              packageDirs.push(customPath);
+            }
+          }
+        } catch (error) {
+          // Custom path doesn't exist or can't be accessed, skip
+          continue;
+        }
+      }
+    }
+
+    return packageDirs;
+  }
+
+  private async searchForAlPackagesDirectories(rootPath: string, packageDirs: string[], maxDepth: number): Promise<void> {
     try {
       const entries = await fs.readdir(rootPath, { withFileTypes: true });
       
@@ -209,22 +239,108 @@ export class ALPackageManager {
         if (entry.isDirectory()) {
           const entryPath = path.join(rootPath, entry.name);
           
+          // Skip system directories and common directories that shouldn't be scanned
+          if (this.shouldSkipDirectory(entry.name)) {
+            continue;
+          }
+          
           // Check if this is an .alpackages directory
           if (entry.name === '.alpackages') {
             packageDirs.push(entryPath);
-          } else {
-            // Recursively search subdirectories
-            const subDirs = await this.autoDiscoverPackageDirectories(entryPath);
-            packageDirs.push(...subDirs);
+          } else if (maxDepth > 0) {
+            // Only search subdirectories if we haven't reached max depth
+            await this.searchForAlPackagesDirectories(entryPath, packageDirs, maxDepth - 1);
           }
         }
       }
     } catch (error) {
-      // Ignore directories we can't access
-      console.warn(`Cannot access directory ${rootPath}: ${error}`);
+      // Ignore directories we can't access - but don't log every error to reduce noise
+      if (error && (error as any).code !== 'EPERM' && (error as any).code !== 'EACCES') {
+        console.warn(`Cannot access directory ${rootPath}: ${error}`);
+      }
+    }
+  }
+
+  /**
+   * Get custom package paths from VS Code AL extension settings
+   */
+  private async getCustomPackagePaths(rootPath: string): Promise<string[]> {
+    const customPaths: string[] = [];
+    
+    try {
+      // Check workspace settings first (.vscode/settings.json)
+      const workspaceSettingsPath = path.join(rootPath, '.vscode', 'settings.json');
+      const workspaceCachePath = await this.readPackageCachePathFromSettings(workspaceSettingsPath);
+      if (workspaceCachePath) {
+        // Resolve relative paths relative to workspace root
+        const resolvedPath = path.isAbsolute(workspaceCachePath) 
+          ? workspaceCachePath 
+          : path.join(rootPath, workspaceCachePath);
+        customPaths.push(resolvedPath);
+      }
+
+      // Check folder-level settings (.vscode/settings.json in parent directories)
+      let currentDir = rootPath;
+      let searchDepth = 0;
+      const maxParentSearch = 3; // Limit how far up we search
+
+      while (currentDir !== path.dirname(currentDir) && searchDepth < maxParentSearch) {
+        const folderSettingsPath = path.join(currentDir, '.vscode', 'settings.json');
+        const folderCachePath = await this.readPackageCachePathFromSettings(folderSettingsPath);
+        if (folderCachePath && folderCachePath !== workspaceCachePath) {
+          const resolvedPath = path.isAbsolute(folderCachePath)
+            ? folderCachePath
+            : path.join(currentDir, folderCachePath);
+          customPaths.push(resolvedPath);
+        }
+        currentDir = path.dirname(currentDir);
+        searchDepth++;
+      }
+    } catch (error) {
+      // Settings reading failed, continue without custom paths
     }
 
-    return packageDirs;
+    return customPaths;
+  }
+
+  /**
+   * Read al.packageCachePath from a VS Code settings file
+   */
+  private async readPackageCachePathFromSettings(settingsPath: string): Promise<string | null> {
+    try {
+      const settingsContent = await fs.readFile(settingsPath, 'utf8');
+      const settings = JSON.parse(settingsContent);
+      return settings['al.packageCachePath'] || null;
+    } catch (error) {
+      // Settings file doesn't exist or can't be parsed
+      return null;
+    }
+  }
+
+  /**
+   * Check if a directory should be skipped during auto-discovery
+   */
+  private shouldSkipDirectory(dirName: string): boolean {
+    const skipDirs = [
+      // System directories
+      'node_modules', '.git', '.vs', '.vscode', 
+      // Build/temp directories
+      'bin', 'obj', 'target', 'build', 'dist', 'out',
+      // Package managers and caches
+      '.npm', '.yarn', '.nuget', '.dotnet',
+      // OS directories and temp
+      'AppData', 'ProgramData', 'Program Files', 'Program Files (x86)',
+      'Windows', 'System32', '$Recycle.Bin', 'Temp', 'tmp',
+      // Hidden/system directories
+      '..', '.',
+      // Docker and containers
+      'windowsfilter'
+    ];
+    
+    return skipDirs.some(skipDir => 
+      dirName.toLowerCase() === skipDir.toLowerCase() ||
+      dirName.startsWith('.') && dirName !== '.alpackages'
+    );
   }
 
   /**

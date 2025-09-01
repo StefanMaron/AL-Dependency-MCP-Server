@@ -1,10 +1,10 @@
 # AL MCP Server
 
-**Model Context Protocol (MCP) server providing intelligent AL (Application Language) code assistance for Microsoft Dynamics 365 Business Central development.**
+**Model Context Protocol (MCP) server providing intelligent AL (Application Language) symbol analysis for Microsoft Dynamics 365 Business Central development. Works with compiled AL packages (.app files) to provide deep code insights, dependency analysis, and cross-project references.**
 
 ## Summary
 
-The AL MCP Server enables AI coding assistants to understand and work with AL codebases by providing access to symbol information, object definitions, and cross-project dependencies. It integrates seamlessly with popular AI tools like Claude Code, GitHub Copilot, Cursor, and others to provide contextual AL development assistance.
+The AL MCP Server enables AI coding assistants to understand and work with compiled AL symbol packages (.app files) by providing access to symbol information, object definitions, and cross-project dependencies. It requires compiled AL packages or .alpackages directories - it does not analyze raw .al source files directly.
 
 ## Features
 
@@ -31,7 +31,7 @@ The AL MCP Server enables AI coding assistants to understand and work with AL co
 
 - **Node.js** 18 or higher
 - **.NET SDK** (for AL CLI tools)
-- **AL packages** - Either .alpackages directory with symbol files or ability to extract them
+- **Compiled AL packages** - Either .alpackages directory with .app symbol files, or individual .app packages to analyze
 
 The installer will automatically check for and install AL CLI tools if needed.
 
@@ -53,6 +53,44 @@ dotnet tool install Microsoft.Dynamics.BusinessCentral.Development.Tools.Linux -
 ```bash
 dotnet tool install Microsoft.Dynamics.BusinessCentral.Development.Tools.Osx --interactive --prerelease --global
 ```
+
+## Package Discovery Approach
+
+The AL MCP Server automatically discovers AL symbol packages using the following approach to prevent system-wide disk scanning:
+
+### Search Strategy
+
+1. **Primary Search**: Look for `.alpackages` directories
+   - Searches current working directory and 2 levels deep
+   - Skips system directories (`node_modules`, `.git`, `AppData`, `Program Files`, etc.)
+   - Stops at first `.alpackages` directory found
+
+2. **Fallback Search**: If no `.alpackages` found, check VS Code AL extension settings
+   - **Workspace settings**: `.vscode/settings.json` in current directory
+   - **Folder settings**: `.vscode/settings.json` in parent directories (up to 3 levels)
+   - Reads `al.packageCachePath` setting and validates the path contains `.app` files
+
+### VS Code Integration
+
+The server respects your AL extension configuration:
+
+```json
+{
+  "al.packageCachePath": "./symbols"
+}
+```
+
+**Supported locations:**
+- ✅ Workspace settings (`.vscode/settings.json`)
+- ✅ Folder settings (parent directory `.vscode/settings.json` files)
+- ❌ User settings (global VS Code settings) - **Known Limitation**
+
+### Security & Performance
+
+- **Limited depth**: Maximum 2 directory levels to prevent infinite recursion
+- **Directory filtering**: Automatically skips system, cache, and build directories
+- **Scope restriction**: Only searches current working directory tree
+- **No system scanning**: Never accesses system folders, temp directories, or recycle bin
 
 ## Adding AL MCP Server to Your AI Assistant
 
@@ -150,6 +188,8 @@ After configuring your AI assistant, test the connection:
 ```
 Can you search for Customer tables in my AL project?
 ```
+
+**Note:** Ensure you have compiled AL packages (.app files) in your .alpackages directory or specify the path to your symbol packages. The server analyzes compiled symbols, not raw .al source files.
 
 Your assistant will automatically download and start the AL MCP Server, then provide AL-specific development assistance!
 
