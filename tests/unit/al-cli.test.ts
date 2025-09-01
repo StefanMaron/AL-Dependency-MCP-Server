@@ -1,10 +1,15 @@
 import { ALCliWrapper } from '../../src/cli/al-cli';
 import { spawn } from 'child_process';
-import * as fs from 'fs/promises';
+import { promises as fs } from 'fs';
 
-// Mock child_process
+// Mock child_process and fs
 jest.mock('child_process');
-jest.mock('fs/promises');
+jest.mock('fs', () => ({
+  promises: {
+    access: jest.fn(),
+    unlink: jest.fn()
+  }
+}));
 
 const mockSpawn = spawn as jest.MockedFunction<typeof spawn>;
 const mockFs = fs as jest.Mocked<typeof fs>;
@@ -14,7 +19,7 @@ describe('ALCliWrapper', () => {
   let mockProcess: any;
 
   beforeEach(() => {
-    jest.resetAllMocks();
+    jest.clearAllMocks();
     
     alCli = new ALCliWrapper();
     
