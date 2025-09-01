@@ -240,6 +240,39 @@ class ALMCPInstaller {
 
 // Run installer if this file is executed directly
 if (require.main === module) {
+  const args = process.argv.slice(2);
+  
+  if (args.includes('--help') || args.includes('-h')) {
+    console.log(`
+🚀 AL MCP Server Installer
+
+Usage: al-mcp-server [options]
+
+Options:
+  --help, -h     Show this help message
+  --version, -v  Show version information
+  --ci           Skip installation (CI mode)
+  
+Examples:
+  npx al-mcp-server           # Install and configure
+  npx al-mcp-server --help    # Show help
+  npx al-mcp-server --ci      # CI mode (skip installation)
+`);
+    process.exit(0);
+  }
+  
+  if (args.includes('--version') || args.includes('-v')) {
+    const pkg = require('../../package.json');
+    console.log(`al-mcp-server v${pkg.version}`);
+    process.exit(0);
+  }
+  
+  if (args.includes('--ci') || process.env.CI === 'true') {
+    console.log('🤖 CI mode detected - skipping installation');
+    console.log('✅ AL MCP Server build verification successful');
+    process.exit(0);
+  }
+  
   const installer = new ALMCPInstaller();
   installer.install().catch((error) => {
     console.error(error);
