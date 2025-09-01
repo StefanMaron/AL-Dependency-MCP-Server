@@ -777,9 +777,16 @@ export class ALMCPServer {
   }
 }
 
-// Start the server
-const server = new ALMCPServer();
-server.start().catch((error) => {
-  console.error('Failed to start AL MCP Server:', error);
-  process.exit(1);
-});
+// Main function for programmatic use
+export async function main(): Promise<void> {
+  const server = new ALMCPServer();
+  await server.start();
+}
+
+// Start the server if this file is executed directly
+if (require.main === module) {
+  main().catch((error) => {
+    console.error('Failed to start AL MCP Server:', error);
+    process.exit(1);
+  });
+}
