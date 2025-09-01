@@ -56,6 +56,20 @@ class ALMCPInstaller {
     }
   }
 
+  private getALPackageName(): string {
+    const platform = os.platform();
+    switch (platform) {
+      case 'win32':
+        return 'Microsoft.Dynamics.BusinessCentral.Development.Tools';
+      case 'linux':
+        return 'Microsoft.Dynamics.BusinessCentral.Development.Tools.Linux';
+      case 'darwin':
+        return 'Microsoft.Dynamics.BusinessCentral.Development.Tools.Osx';
+      default:
+        return 'Microsoft.Dynamics.BusinessCentral.Development.Tools';
+    }
+  }
+
   private async checkALTools(): Promise<void> {
     console.log('🔧 Checking AL CLI tools...');
     
@@ -65,13 +79,16 @@ class ALMCPInstaller {
     } catch {
       console.log('⚠️  AL CLI tools not found. Trying to install...');
       try {
-        await this.runCommand('dotnet', ['tool', 'install', '--global', 'Microsoft.Dynamics.AL.Tools']);
+        const packageName = this.getALPackageName();
+        await this.runCommand('dotnet', ['tool', 'install', '--global', packageName, '--prerelease']);
         console.log('✅ AL CLI tools installed');
       } catch (error) {
         console.log('⚠️  Could not install AL CLI tools automatically');
         console.log('📝 The MCP server can still work with existing .alpackages');
-        console.log('💡 To extract symbols from .app files, install manually:');
-        console.log('   dotnet tool install --global Microsoft.Dynamics.AL.Tools');
+        console.log('💡 To extract symbols from .app files, install manually (choose based on your OS):');
+        console.log('   Windows: dotnet tool install Microsoft.Dynamics.BusinessCentral.Development.Tools --prerelease --global');
+        console.log('   Linux:   dotnet tool install Microsoft.Dynamics.BusinessCentral.Development.Tools.Linux --prerelease --global');
+        console.log('   macOS:   dotnet tool install Microsoft.Dynamics.BusinessCentral.Development.Tools.Osx --prerelease --global');
       }
     }
   }

@@ -35,6 +35,25 @@ The AL MCP Server enables AI coding assistants to understand and work with AL co
 
 The installer will automatically check for and install AL CLI tools if needed.
 
+### Manual AL CLI Tools Installation
+
+If needed, you can manually install the AL CLI tools (choose based on your OS):
+
+**Windows:**
+```bash
+dotnet tool install Microsoft.Dynamics.BusinessCentral.Development.Tools --interactive --prerelease --global
+```
+
+**Linux:**
+```bash
+dotnet tool install Microsoft.Dynamics.BusinessCentral.Development.Tools.Linux --interactive --prerelease --global
+```
+
+**macOS:**
+```bash
+dotnet tool install Microsoft.Dynamics.BusinessCentral.Development.Tools.Osx --interactive --prerelease --global
+```
+
 ## Adding AL MCP Server to Your AI Assistant
 
 Configure your AI assistant to use the AL MCP Server. The server will be automatically downloaded and started when your assistant needs it.

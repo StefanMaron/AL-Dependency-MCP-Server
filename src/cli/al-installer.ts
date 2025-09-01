@@ -191,14 +191,32 @@ export class ALInstaller {
   }
 
   /**
+   * Get OS-specific AL CLI package name
+   */
+  private getALPackageName(): string {
+    const platform = os.platform();
+    switch (platform) {
+      case 'win32':
+        return 'Microsoft.Dynamics.BusinessCentral.Development.Tools';
+      case 'linux':
+        return 'Microsoft.Dynamics.BusinessCentral.Development.Tools.Linux';
+      case 'darwin':
+        return 'Microsoft.Dynamics.BusinessCentral.Development.Tools.Osx';
+      default:
+        return 'Microsoft.Dynamics.BusinessCentral.Development.Tools';
+    }
+  }
+
+  /**
    * Install AL CLI using dotnet tool install
    */
   private async installALCli(): Promise<{ success: boolean; message: string }> {
     return new Promise((resolve) => {
       console.log('Installing AL CLI using dotnet tool...');
       
+      const packageName = this.getALPackageName();
       const process = spawn('dotnet', [
-        'tool', 'install', '--global', 'Microsoft.Dynamics.AL.Tools'
+        'tool', 'install', '--global', packageName, '--prerelease'
       ], { stdio: 'pipe' });
       
       let output = '';
@@ -260,8 +278,10 @@ export class ALInstaller {
       '1. Install .NET SDK (if not already installed):',
       '   https://dotnet.microsoft.com/download',
       '',
-      '2. Install AL CLI:',
-      '   dotnet tool install --global Microsoft.Dynamics.AL.Tools',
+      '2. Install AL CLI (choose based on your OS):',
+      '   Windows: dotnet tool install Microsoft.Dynamics.BusinessCentral.Development.Tools --interactive --prerelease --global',
+      '   Linux:   dotnet tool install Microsoft.Dynamics.BusinessCentral.Development.Tools.Linux --interactive --prerelease --global',
+      '   macOS:   dotnet tool install Microsoft.Dynamics.BusinessCentral.Development.Tools.Osx --interactive --prerelease --global',
       '',
       '3. Verify installation:',
       '   AL --version',
