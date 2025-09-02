@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.5] - 2025-09-02
+
+### Added
+- add automated changelog system with dynamic previous releases
+- auto-discover AL projects and filter to latest versions
+- add support for non-namespace AL packages (legacy format)
+
 ## [2.0.4] - 2025-09-02
 
 ### Added
