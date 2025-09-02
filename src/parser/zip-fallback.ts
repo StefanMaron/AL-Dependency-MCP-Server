@@ -86,37 +86,77 @@ export class ZipFallbackExtractor {
    * Extract ZIP file using PowerShell on Windows
    */
   private async runWindowsUnzip(zipPath: string, extractDir: string): Promise<void> {
-    return new Promise((resolve, reject) => {
-      // Use PowerShell's Expand-Archive command
-      const psCommand = `Expand-Archive -Path "${zipPath}" -DestinationPath "${extractDir}" -Force`;
+    return new Promise(async (resolve, reject) => {
+      let tempZipPath: string | null = null;
       
-      const unzipProcess = spawn('powershell', ['-Command', psCommand], {
-        stdio: ['pipe', 'pipe', 'pipe']
-      });
-
-      let stderr = '';
-      
-      unzipProcess.stderr?.on('data', (data) => {
-        stderr += data.toString();
-      });
-
-      unzipProcess.on('close', async (code) => {
-        if (code === 0) {
-          try {
-            // Check if SymbolReference.json was actually extracted
-            await fs.access(path.join(extractDir, 'SymbolReference.json'));
-            resolve();
-          } catch {
-            reject(new Error(`PowerShell extraction completed but SymbolReference.json not found: ${stderr}`));
-          }
-        } else {
-          reject(new Error(`PowerShell extraction failed with code ${code}: ${stderr}`));
+      try {
+        // PowerShell Expand-Archive requires .zip extension
+        // Create a temporary copy with .zip extension if needed
+        if (!zipPath.toLowerCase().endsWith('.zip')) {
+          const tempDir = path.dirname(zipPath);
+          const originalName = path.basename(zipPath, path.extname(zipPath));
+          tempZipPath = path.join(tempDir, `${originalName}_temp.zip`);
+          await fs.copyFile(zipPath, tempZipPath);
         }
-      });
+        
+        const zipToExtract = tempZipPath || zipPath;
+        const psCommand = `Expand-Archive -Path "${zipToExtract}" -DestinationPath "${extractDir}" -Force`;
+        
+        const unzipProcess = spawn('powershell', ['-Command', psCommand], {
+          stdio: ['pipe', 'pipe', 'pipe']
+        });
 
-      unzipProcess.on('error', (error) => {
-        reject(new Error(`Failed to run PowerShell command: ${error.message}`));
-      });
+        let stderr = '';
+        
+        unzipProcess.stderr?.on('data', (data) => {
+          stderr += data.toString();
+        });
+
+        unzipProcess.on('close', async (code) => {
+          // Clean up temporary file if created
+          if (tempZipPath) {
+            try {
+              await fs.unlink(tempZipPath);
+            } catch {
+              // Ignore cleanup errors
+            }
+          }
+          
+          if (code === 0) {
+            try {
+              // Check if SymbolReference.json was actually extracted
+              await fs.access(path.join(extractDir, 'SymbolReference.json'));
+              resolve();
+            } catch {
+              reject(new Error(`PowerShell extraction completed but SymbolReference.json not found: ${stderr}`));
+            }
+          } else {
+            reject(new Error(`PowerShell extraction failed with code ${code}: ${stderr}`));
+          }
+        });
+
+        unzipProcess.on('error', async (error) => {
+          // Clean up temporary file if created
+          if (tempZipPath) {
+            try {
+              await fs.unlink(tempZipPath);
+            } catch {
+              // Ignore cleanup errors
+            }
+          }
+          reject(new Error(`Failed to run PowerShell command: ${error.message}`));
+        });
+      } catch (error) {
+        // Clean up temporary file if created
+        if (tempZipPath) {
+          try {
+            await fs.unlink(tempZipPath);
+          } catch {
+            // Ignore cleanup errors
+          }
+        }
+        reject(error);
+      }
     });
   }
 
