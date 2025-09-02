@@ -16,8 +16,12 @@ export class ZipFallbackExtractor {
     const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'al-symbols-'));
     
     try {
-      // Use command line unzip to extract the file
-      await this.runUnzip(symbolPackagePath, tempDir);
+      // AL packages have a 40-byte header that prevents standard ZIP extraction
+      // Create a stripped version for extraction
+      const strippedZipPath = await this.stripALPackageHeader(symbolPackagePath, tempDir);
+      
+      // Use command line unzip to extract the file from the stripped package
+      await this.runUnzip(strippedZipPath, tempDir);
       
       // Read the extracted SymbolReference.json
       const symbolsPath = path.join(tempDir, 'SymbolReference.json');
@@ -70,6 +74,49 @@ export class ZipFallbackExtractor {
   }
 
   /**
+   * Strip the AL package header to create a valid ZIP file
+   * AL packages have a 40-byte NAVX header before the ZIP content
+   */
+  private async stripALPackageHeader(alPackagePath: string, tempDir: string): Promise<string> {
+    const strippedPath = path.join(tempDir, `${path.basename(alPackagePath, '.app')}_stripped.zip`);
+    
+    // Read the original file
+    const originalBuffer = await fs.readFile(alPackagePath);
+    
+    // Check if this is an AL package with NAVX header
+    if (this.hasALPackageHeader(originalBuffer)) {
+      // Strip the 40-byte AL header to reveal the ZIP content
+      const strippedBuffer = originalBuffer.subarray(40);
+      await fs.writeFile(strippedPath, strippedBuffer);
+    } else {
+      // Not an AL package or already stripped, use as-is
+      await fs.writeFile(strippedPath, originalBuffer);
+    }
+    
+    return strippedPath;
+  }
+
+  /**
+   * Check if buffer contains AL package NAVX header
+   */
+  private hasALPackageHeader(buffer: Buffer): boolean {
+    if (buffer.length < 44) return false;
+    
+    // Check for NAVX signature at start (bytes 0-3)
+    const hasStartSignature = buffer[0] === 0x4E && buffer[1] === 0x41 && 
+                              buffer[2] === 0x56 && buffer[3] === 0x58; // "NAVX"
+    
+    // Check for NAVX signature at byte 36-39  
+    const hasEndSignature = buffer[36] === 0x4E && buffer[37] === 0x41 && 
+                            buffer[38] === 0x56 && buffer[39] === 0x58; // "NAVX"
+    
+    // Check for ZIP signature at byte 40 (PK)
+    const hasZipSignature = buffer[40] === 0x50 && buffer[41] === 0x4B; // "PK"
+    
+    return hasStartSignature && hasEndSignature && hasZipSignature;
+  }
+
+  /**
    * Run platform-specific unzip command to extract ZIP file
    */
   private async runUnzip(zipPath: string, extractDir: string): Promise<void> {
@@ -86,77 +133,37 @@ export class ZipFallbackExtractor {
    * Extract ZIP file using PowerShell on Windows
    */
   private async runWindowsUnzip(zipPath: string, extractDir: string): Promise<void> {
-    return new Promise(async (resolve, reject) => {
-      let tempZipPath: string | null = null;
+    return new Promise((resolve, reject) => {
+      // Since we've stripped the AL header, this is now a proper ZIP file
+      const psCommand = `Expand-Archive -Path "${zipPath}" -DestinationPath "${extractDir}" -Force`;
       
-      try {
-        // PowerShell Expand-Archive requires .zip extension
-        // Create a temporary copy with .zip extension if needed
-        if (!zipPath.toLowerCase().endsWith('.zip')) {
-          const tempDir = path.dirname(zipPath);
-          const originalName = path.basename(zipPath, path.extname(zipPath));
-          tempZipPath = path.join(tempDir, `${originalName}_temp.zip`);
-          await fs.copyFile(zipPath, tempZipPath);
-        }
-        
-        const zipToExtract = tempZipPath || zipPath;
-        const psCommand = `Expand-Archive -Path "${zipToExtract}" -DestinationPath "${extractDir}" -Force`;
-        
-        const unzipProcess = spawn('powershell', ['-Command', psCommand], {
-          stdio: ['pipe', 'pipe', 'pipe']
-        });
+      const unzipProcess = spawn('powershell', ['-Command', psCommand], {
+        stdio: ['pipe', 'pipe', 'pipe']
+      });
 
-        let stderr = '';
-        
-        unzipProcess.stderr?.on('data', (data) => {
-          stderr += data.toString();
-        });
+      let stderr = '';
+      
+      unzipProcess.stderr?.on('data', (data) => {
+        stderr += data.toString();
+      });
 
-        unzipProcess.on('close', async (code) => {
-          // Clean up temporary file if created
-          if (tempZipPath) {
-            try {
-              await fs.unlink(tempZipPath);
-            } catch {
-              // Ignore cleanup errors
-            }
-          }
-          
-          if (code === 0) {
-            try {
-              // Check if SymbolReference.json was actually extracted
-              await fs.access(path.join(extractDir, 'SymbolReference.json'));
-              resolve();
-            } catch {
-              reject(new Error(`PowerShell extraction completed but SymbolReference.json not found: ${stderr}`));
-            }
-          } else {
-            reject(new Error(`PowerShell extraction failed with code ${code}: ${stderr}`));
-          }
-        });
-
-        unzipProcess.on('error', async (error) => {
-          // Clean up temporary file if created
-          if (tempZipPath) {
-            try {
-              await fs.unlink(tempZipPath);
-            } catch {
-              // Ignore cleanup errors
-            }
-          }
-          reject(new Error(`Failed to run PowerShell command: ${error.message}`));
-        });
-      } catch (error) {
-        // Clean up temporary file if created
-        if (tempZipPath) {
+      unzipProcess.on('close', async (code) => {
+        if (code === 0) {
           try {
-            await fs.unlink(tempZipPath);
+            // Check if SymbolReference.json was actually extracted
+            await fs.access(path.join(extractDir, 'SymbolReference.json'));
+            resolve();
           } catch {
-            // Ignore cleanup errors
+            reject(new Error(`PowerShell extraction completed but SymbolReference.json not found: ${stderr}`));
           }
+        } else {
+          reject(new Error(`PowerShell extraction failed with code ${code}: ${stderr}`));
         }
-        reject(error);
-      }
+      });
+
+      unzipProcess.on('error', (error) => {
+        reject(new Error(`Failed to run PowerShell command: ${error.message}`));
+      });
     });
   }
 
@@ -165,6 +172,7 @@ export class ZipFallbackExtractor {
    */
   private async runUnixUnzip(zipPath: string, extractDir: string): Promise<void> {
     return new Promise((resolve, reject) => {
+      // Since we've stripped the AL header, this is now a proper ZIP file
       const unzipProcess = spawn('unzip', ['-o', '-q', zipPath], {
         cwd: extractDir,
         stdio: ['pipe', 'pipe', 'pipe']
@@ -177,14 +185,13 @@ export class ZipFallbackExtractor {
       });
 
       unzipProcess.on('close', async (code) => {
-        // unzip returns exit code 1 for warnings (like extra bytes) but still extracts successfully
-        if (code === 0 || code === 1) {
+        if (code === 0) {
           try {
             // Check if SymbolReference.json was actually extracted
             await fs.access(path.join(extractDir, 'SymbolReference.json'));
             resolve();
           } catch {
-            reject(new Error(`Unzip completed with code ${code} but SymbolReference.json not found: ${stderr}`));
+            reject(new Error(`Unzip completed but SymbolReference.json not found: ${stderr}`));
           }
         } else {
           reject(new Error(`Unzip failed with code ${code}: ${stderr}`));
