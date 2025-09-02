@@ -226,6 +226,20 @@ AL MCP Server
 └── Auto-Discovery (smart .alpackages detection)
 ```
 
+## Changelog
+
+### Latest Release (v2.0.4)
+- ✅ **Auto-discover AL projects** - Finds app.json + .app files in project directories
+- ✅ **Version filtering** - Uses only the most recent version of each package  
+- ✅ **Legacy AL support** - Works with non-namespace AL packages (PTEs)
+- ✅ **Fixed ZIP extraction** - Resolves AL package NAVX header issues
+
+### Previous Releases
+- **v2.0.3** - Cross-platform extraction support, VS Code settings integration
+- **v2.0.2** - OS-specific AL CLI installation improvements
+
+📋 **Full changelog**: See [CHANGELOG.md](./CHANGELOG.md) for complete release history
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) file for details.

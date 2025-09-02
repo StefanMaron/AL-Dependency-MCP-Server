@@ -69,8 +69,100 @@ jobs:
       - name: Bump version (manual trigger)
         if: github.event_name == 'workflow_dispatch'
         run: |
+          OLD_VERSION=$(node -p "require('./package.json').version")
           npm version ${{ github.event.inputs.version_type }} --no-git-tag-version
-          echo "NEW_VERSION=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
+          NEW_VERSION=$(node -p "require('./package.json').version")
+          echo "OLD_VERSION=$OLD_VERSION" >> $GITHUB_ENV
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+
+      - name: Update changelog (manual trigger)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          # Get commits since last version for changelog
+          LATEST_TAG="v${{ env.OLD_VERSION }}"
+          
+          # Get commits with conventional commit format
+          COMMITS=$(git log ${LATEST_TAG}..HEAD --oneline --format="%s" | head -20)
+          
+          # Create new changelog entry
+          echo "## [${{ env.NEW_VERSION }}] - $(date +%Y-%m-%d)" > new_entry.md
+          echo "" >> new_entry.md
+          
+          # Process commits into categories
+          echo "$COMMITS" | while IFS= read -r commit; do
+            if [[ $commit == feat:* ]] || [[ $commit == *"add"* ]] || [[ $commit == *"Add"* ]]; then
+              echo "- ${commit#*: }" >> added.txt
+            elif [[ $commit == fix:* ]] || [[ $commit == *"fix"* ]] || [[ $commit == *"Fix"* ]]; then
+              echo "- ${commit#*: }" >> fixed.txt
+            else
+              echo "- $commit" >> changed.txt
+            fi
+          done
+          
+          # Add categories to changelog entry if they have content
+          if [[ -f added.txt ]] && [[ -s added.txt ]]; then
+            echo "### Added" >> new_entry.md
+            cat added.txt >> new_entry.md
+            echo "" >> new_entry.md
+          fi
+          
+          if [[ -f fixed.txt ]] && [[ -s fixed.txt ]]; then
+            echo "### Fixed" >> new_entry.md
+            cat fixed.txt >> new_entry.md
+            echo "" >> new_entry.md
+          fi
+          
+          if [[ -f changed.txt ]] && [[ -s changed.txt ]]; then
+            echo "### Changed" >> new_entry.md
+            cat changed.txt >> new_entry.md
+            echo "" >> new_entry.md
+          fi
+          
+          # Insert new entry into CHANGELOG.md after [Unreleased] section
+          FIRST_RELEASE_LINE=$(grep -n "^## \[.*\] -" CHANGELOG.md | head -n 1 | cut -d: -f1)
+          
+          if [[ -n "$FIRST_RELEASE_LINE" ]]; then
+            head -n $((FIRST_RELEASE_LINE - 1)) CHANGELOG.md > temp_changelog.md
+            cat new_entry.md >> temp_changelog.md
+            tail -n +$FIRST_RELEASE_LINE CHANGELOG.md >> temp_changelog.md
+          else
+            sed '/^## \[Unreleased\]/a\\' CHANGELOG.md > temp_changelog.md
+            cat new_entry.md >> temp_changelog.md
+          fi
+          
+          mv temp_changelog.md CHANGELOG.md
+          
+          # Update README.md changelog section dynamically
+          # Get the latest release info from CHANGELOG.md
+          LATEST_CHANGES=$(awk '/^## \[${{ env.NEW_VERSION }}\]/,/^## \[/{if(/^## \[/ && !/^## \[${{ env.NEW_VERSION }}\]/) exit; if(!/^## \[${{ env.NEW_VERSION }}\]/ && !/^$/ && /^### |^- /) print}' CHANGELOG.md | head -8)
+          
+          # Get previous releases dynamically from CHANGELOG.md (skip the new one we just added)
+          PREVIOUS_RELEASES=$(grep "^## \[.*\] -" CHANGELOG.md | grep -v "^## \[${{ env.NEW_VERSION }}\]" | head -3 | while IFS= read -r line; do
+            VERSION=$(echo "$line" | grep -o '\[.*\]' | tr -d '[]')
+            echo "- **v$VERSION** - $(echo "$line" | cut -d'-' -f3- | sed 's/^ *//')"
+          done)
+          
+          # Create complete README changelog section
+          cat > readme_changelog_section.md << EOF
+          ## Changelog
+
+          ### Latest Release (v${{ env.NEW_VERSION }})
+          $LATEST_CHANGES
+
+          ### Previous Releases
+          $PREVIOUS_RELEASES
+
+          📋 **Full changelog**: See [CHANGELOG.md](./CHANGELOG.md) for complete release history
+          EOF
+          
+          # Replace the entire changelog section in README.md
+          sed -i '/^## Changelog$/,/^## License$/{
+            /^## Changelog$/{
+              r readme_changelog_section.md
+              d
+            }
+            /^## License$/!d
+          }' README.md
 
       # For releases, extract version from tag
       - name: Set version from release (release trigger)
@@ -89,8 +181,8 @@ jobs:
       - name: Create and push tag (manual trigger)
         if: github.event_name == 'workflow_dispatch'
         run: |
-          git add package.json package-lock.json
-          git commit -m "chore: bump version to v${{ env.NEW_VERSION }}"
+          git add package.json package-lock.json CHANGELOG.md README.md
+          git commit -m "chore: bump version to v${{ env.NEW_VERSION }} with changelog update"
           git tag "v${{ env.NEW_VERSION }}"
           git push origin main --tags
         env:
