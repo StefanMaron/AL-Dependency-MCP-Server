@@ -98,11 +98,47 @@ export class StreamingSymbolParser {
   private processSymbolReference(symbolRef: any, packageName: string): ALObject[] {
     const objects: ALObject[] = [];
     
+    // Modern format: objects are organized within namespaces
     if (symbolRef.Namespaces) {
       this.processNamespaces(symbolRef.Namespaces, objects, packageName);
     }
     
+    // Legacy format: objects are directly at root level (pre-namespace AL)
+    // This handles older AL packages and PTEs that don't use namespaces
+    this.processObjectsAtLevel(symbolRef, objects, packageName);
+    
     return objects;
+  }
+
+  /**
+   * Process objects at any level (namespace or root level)
+   */
+  private processObjectsAtLevel(level: any, objects: ALObject[], packageName: string): void {
+    if (!level || typeof level !== 'object') return;
+
+    const objectTypes = [
+      'Tables', 'Pages', 'Codeunits', 'Reports', 'Queries', 'XmlPorts',
+      'Enums', 'EnumTypes', 'Interfaces', 'PermissionSets', 'ControlAddIns'
+    ];
+    
+    for (const objectType of objectTypes) {
+      if (level[objectType] && Array.isArray(level[objectType])) {
+        let singularType = objectType.slice(0, -1); // Remove 's' from plural
+        
+        // Handle special cases
+        if (objectType === 'EnumTypes') {
+          singularType = 'Enum';
+        } else if (objectType === 'Queries') {
+          singularType = 'Query';
+        } else if (objectType === 'XmlPorts') {
+          singularType = 'XmlPort';
+        } else if (objectType === 'ControlAddIns') {
+          singularType = 'ControlAddIn';
+        }
+        
+        this.processObjectArray(level[objectType], singularType, objects, packageName);
+      }
+    }
   }
 
   /**
@@ -113,29 +149,7 @@ export class StreamingSymbolParser {
 
     for (const namespace of namespaces) {
       // Process direct object arrays in this namespace
-      const objectTypes = [
-        'Tables', 'Pages', 'Codeunits', 'Reports', 'Queries', 'XmlPorts',
-        'Enums', 'EnumTypes', 'Interfaces', 'PermissionSets', 'ControlAddIns'
-      ];
-      
-      for (const objectType of objectTypes) {
-        if (namespace[objectType] && Array.isArray(namespace[objectType])) {
-          let singularType = objectType.slice(0, -1); // Remove 's' from plural
-          
-          // Handle special cases
-          if (objectType === 'EnumTypes') {
-            singularType = 'Enum';
-          } else if (objectType === 'Queries') {
-            singularType = 'Query';
-          } else if (objectType === 'XmlPorts') {
-            singularType = 'XmlPort';
-          } else if (objectType === 'ControlAddIns') {
-            singularType = 'ControlAddIn';
-          }
-          
-          this.processObjectArray(namespace[objectType], singularType, objects, packageName);
-        }
-      }
+      this.processObjectsAtLevel(namespace, objects, packageName);
 
       // Process nested namespaces recursively
       if (namespace.Namespaces && Array.isArray(namespace.Namespaces)) {
