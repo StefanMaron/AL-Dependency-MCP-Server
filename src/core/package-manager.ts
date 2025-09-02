@@ -74,12 +74,22 @@ export class ALPackageManager {
       this.database.clear();
     }
 
-    this.reportProgress('loading', 0, packagePaths.length, 'Starting package loading');
+    // Filter to only use the most recent version of each package
+    const filteredPaths = await this.filterToLatestVersions(packagePaths);
+    const originalCount = packagePaths.length;
+    const filteredCount = filteredPaths.length;
+    
+    if (originalCount > filteredCount) {
+      this.reportProgress('filtering', filteredCount, originalCount, 
+        `Filtered to ${filteredCount} most recent versions from ${originalCount} packages`);
+    }
+
+    this.reportProgress('loading', 0, filteredPaths.length, 'Starting package loading');
 
     // Process packages with controlled concurrency
-    const maxConcurrency = Math.min(4, packagePaths.length);
-    for (let i = 0; i < packagePaths.length; i += maxConcurrency) {
-      const batch = packagePaths.slice(i, i + maxConcurrency);
+    const maxConcurrency = Math.min(4, filteredPaths.length);
+    for (let i = 0; i < filteredPaths.length; i += maxConcurrency) {
+      const batch = filteredPaths.slice(i, i + maxConcurrency);
       
       const batchPromises = batch.map(async (packagePath) => {
         try {
@@ -87,7 +97,7 @@ export class ALPackageManager {
           loadedPackages.push(result.packageInfo);
           totalObjects += result.objectCount;
           
-          this.reportProgress('loading', i + batch.indexOf(packagePath) + 1, packagePaths.length,
+          this.reportProgress('loading', i + batch.indexOf(packagePath) + 1, filteredPaths.length,
             `Loaded ${result.packageInfo.name}`);
         } catch (error) {
           const errorMessage = `Failed to load ${path.basename(packagePath)}: ${error}`;
@@ -105,7 +115,7 @@ export class ALPackageManager {
 
     const loadTimeMs = Date.now() - startTime;
 
-    this.reportProgress('completed', loadedPackages.length, packagePaths.length, 
+    this.reportProgress('completed', loadedPackages.length, filteredPaths.length, 
       `Loaded ${loadedPackages.length} packages in ${loadTimeMs}ms`);
 
     return {
@@ -197,13 +207,16 @@ export class ALPackageManager {
   }
 
   /**
-   * Find .alpackages directories automatically
+   * Find .alpackages directories and AL project directories automatically
    */
   async autoDiscoverPackageDirectories(rootPath: string, maxDepth: number = 2): Promise<string[]> {
     const packageDirs: string[] = [];
     
     // First, try to find .alpackages directories
     await this.searchForAlPackagesDirectories(rootPath, packageDirs, maxDepth);
+    
+    // Also look for AL project directories (containing app.json and .app files)
+    await this.searchForProjectDirectories(rootPath, packageDirs, maxDepth);
     
     // If no .alpackages found, check for custom AL packageCachePath settings
     if (packageDirs.length === 0) {
@@ -229,6 +242,47 @@ export class ALPackageManager {
     }
 
     return packageDirs;
+  }
+
+  private async searchForProjectDirectories(rootPath: string, packageDirs: string[], maxDepth: number): Promise<void> {
+    try {
+      const entries = await fs.readdir(rootPath, { withFileTypes: true });
+      
+      for (const entry of entries) {
+        if (entry.isDirectory()) {
+          const entryPath = path.join(rootPath, entry.name);
+          
+          // Skip system directories and common directories that shouldn't be scanned
+          if (this.shouldSkipDirectory(entry.name)) {
+            continue;
+          }
+          
+          // Check if this directory contains app.json (AL project) and has .app files
+          const appJsonPath = path.join(entryPath, 'app.json');
+          try {
+            await fs.access(appJsonPath);
+            // Found app.json, check for .app files in this directory
+            const appFiles = await this.discoverPackages({
+              packagesPath: entryPath,
+              recursive: false
+            });
+            if (appFiles.length > 0) {
+              packageDirs.push(entryPath);
+            }
+          } catch {
+            // No app.json or no access, continue searching subdirectories
+            if (maxDepth > 0) {
+              await this.searchForProjectDirectories(entryPath, packageDirs, maxDepth - 1);
+            }
+          }
+        }
+      }
+    } catch (error) {
+      // Ignore directories we can't access
+      if (error && (error as any).code !== 'EPERM' && (error as any).code !== 'EACCES') {
+        console.warn(`Cannot access directory ${rootPath}: ${error}`);
+      }
+    }
   }
 
   private async searchForAlPackagesDirectories(rootPath: string, packageDirs: string[], maxDepth: number): Promise<void> {
@@ -393,6 +447,97 @@ export class ALPackageManager {
     }
 
     return sorted;
+  }
+
+  /**
+   * Filter package paths to only include the most recent version of each package
+   */
+  async filterToLatestVersions(packagePaths: string[]): Promise<string[]> {
+    const packagesByName = new Map<string, { path: string; version: string; timestamp: number }[]>();
+    
+    // Group packages by name
+    for (const packagePath of packagePaths) {
+      try {
+        const manifest = await this.alCli.getPackageManifest(packagePath);
+        const packageKey = `${manifest.publisher}_${manifest.name}`;
+        
+        if (!packagesByName.has(packageKey)) {
+          packagesByName.set(packageKey, []);
+        }
+        
+        // Get file timestamp for secondary sorting
+        const stats = await fs.stat(packagePath);
+        
+        packagesByName.get(packageKey)!.push({
+          path: packagePath,
+          version: manifest.version,
+          timestamp: stats.mtimeMs
+        });
+      } catch (error) {
+        // If we can't get manifest, include the package anyway (might be corrupted but shouldn't be filtered out)
+        console.warn(`Failed to get manifest for ${packagePath}, including anyway: ${error}`);
+        const fallbackKey = path.basename(packagePath);
+        if (!packagesByName.has(fallbackKey)) {
+          packagesByName.set(fallbackKey, []);
+        }
+        const stats = await fs.stat(packagePath).catch(() => ({ mtimeMs: 0 }));
+        packagesByName.get(fallbackKey)!.push({
+          path: packagePath,
+          version: '0.0.0.0',
+          timestamp: stats.mtimeMs
+        });
+      }
+    }
+    
+    // Select the most recent version of each package
+    const filteredPaths: string[] = [];
+    for (const [packageKey, versions] of packagesByName) {
+      if (versions.length === 1) {
+        filteredPaths.push(versions[0].path);
+      } else {
+        // Sort by version (semantic versioning), then by timestamp (most recent first)
+        versions.sort((a, b) => {
+          const versionCompare = this.compareVersions(b.version, a.version);
+          if (versionCompare !== 0) {
+            return versionCompare;
+          }
+          // If versions are equal, prefer the most recent file
+          return b.timestamp - a.timestamp;
+        });
+        
+        filteredPaths.push(versions[0].path);
+        
+        // Log filtered out versions for debugging
+        if (versions.length > 1) {
+          const filtered = versions.slice(1).map(v => `${v.version} (${path.basename(v.path)})`);
+          console.log(`Filtered out older versions of ${packageKey}: ${filtered.join(', ')}`);
+        }
+      }
+    }
+    
+    return filteredPaths.sort();
+  }
+
+  /**
+   * Compare two version strings (e.g., "1.2.3.4" vs "1.2.4.0")
+   * Returns: > 0 if version1 > version2, < 0 if version1 < version2, 0 if equal
+   */
+  private compareVersions(version1: string, version2: string): number {
+    const v1Parts = version1.split('.').map(part => parseInt(part, 10) || 0);
+    const v2Parts = version2.split('.').map(part => parseInt(part, 10) || 0);
+    
+    // Pad arrays to same length
+    const maxLength = Math.max(v1Parts.length, v2Parts.length);
+    while (v1Parts.length < maxLength) v1Parts.push(0);
+    while (v2Parts.length < maxLength) v2Parts.push(0);
+    
+    // Compare each part
+    for (let i = 0; i < maxLength; i++) {
+      if (v1Parts[i] > v2Parts[i]) return 1;
+      if (v1Parts[i] < v2Parts[i]) return -1;
+    }
+    
+    return 0;
   }
 
   /**
