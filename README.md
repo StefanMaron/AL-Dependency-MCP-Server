@@ -1,6 +1,30 @@
 # AL MCP Server
 
-**AI-powered symbol analysis for Microsoft Dynamics 365 Business Central development. Get intelligent insights from compiled AL packages directly in your AI assistant.**
+**Bridge the gap between AL development and AI coding assistance.**
+
+## The Problem This Solves
+
+**AI assistants are "blind" to AL dependencies and symbols.** When working with Microsoft Dynamics 365 Business Central AL code, AI assistants cannot see:
+
+- Compiled AL packages (.app files) and their symbols
+- Object relationships and dependencies between AL objects  
+- Available procedures, fields, and properties from dependency packages
+- Business Central base application structure and extensions
+
+**Without this visibility, AI assistants can't provide effective AL development help.**
+
+## The Solution
+
+**The AL MCP Server makes AL dependencies and symbols visible to AI coding assistants.** 
+
+This MCP (Model Context Protocol) server exposes compiled AL packages (.app files) and their symbol information directly to AI assistants, enabling them to:
+
+- Understand your AL project's complete object structure and dependencies
+- Provide context-aware code suggestions based on actual AL symbols
+- Help navigate complex AL object relationships and extensions
+- Offer informed guidance on AL development patterns and best practices
+
+**Transform your AL development workflow with AI that truly understands your codebase.**
 
 ## Quick Start
 
@@ -33,7 +57,7 @@ claude mcp add al-mcp-server -- npx al-mcp-server
 ```json
 {
   "claude.mcpServers": {
-    "al": {
+    "al-symbols-mcp": {
       "command": "npx",
       "args": ["al-mcp-server"]
     }
@@ -47,7 +71,7 @@ Create `.vscode/mcp.json` in your AL workspace:
 ```json
 {
   "servers": {
-    "al": {
+    "al-symbols-mcp": {
       "type": "stdio",
       "command": "npx", 
       "args": ["al-mcp-server"]
@@ -61,7 +85,7 @@ Create `.vscode/mcp.json` in your AL workspace:
 Add to Cursor settings (Settings → Features → Model Context Protocol):
 ```json
 {
-  "al": {
+  "al-symbols-mcp": {
     "command": "npx",
     "args": ["al-mcp-server"]
   }
@@ -74,7 +98,7 @@ Add to `~/.continue/config.json`:
 ```json
 {
   "mcpServers": {
-    "al": {
+    "al-symbols-mcp": {
       "command": "npx",
       "args": ["al-mcp-server"]
     }
@@ -88,7 +112,7 @@ Add to VS Code settings:
 ```json
 {
   "cody.mcpServers": {
-    "al": {
+    "al-symbols-mcp": {
       "command": "npx",
       "args": ["al-mcp-server"]
     }
@@ -112,9 +136,9 @@ Can you search for Customer tables in my AL project?
 
 The server will automatically start and provide AL development assistance!
 
-## What You Can Do
+## What This Enables
 
-Once configured, your AI assistant becomes an AL development expert with access to:
+Once configured, your AI assistant gains complete visibility into your AL environment and becomes an AL development expert with access to:
 
 ### Smart Object Discovery
 - **Search objects** by name, type, or pattern across all packages
@@ -195,4 +219,4 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ---
 
-**Transform your AL development with AI-powered code assistance!**
+**Stop working with "blind" AI assistants. Give them the AL symbol visibility they need to truly help your development.**
