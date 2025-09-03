@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2025-09-03
+
+### Added
+- add LLM guidance when AL packages not loaded
+- add comprehensive automated tests for AL Language tools installation
+
+### Fixed
+- resolve ALInstaller concurrent installation test failure and hanging tests
+- resolve hanging AL installer tests and ensure all tests pass
+
+### Changed
+- refactor: enhance README for clarity, update AI assistant configuration to use 'al-symbols-mcp'
+- refactor: update README for clarity and structure, enhance quick start instructions
+- claude improvements
+
 ## [2.0.5] - 2025-09-02
 
 ### Added
