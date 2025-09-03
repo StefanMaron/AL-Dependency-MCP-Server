@@ -25,6 +25,10 @@ export class ALInstaller {
         requiresManualInstall: false
       };
     }
+    
+    // Set flag early to prevent race conditions during async operations
+    this.installationInProgress = true;
+    
     try {
       // First check if AL is already available
       const existingPath = await this.findExistingAL();
@@ -58,46 +62,41 @@ export class ALInstaller {
       }
 
       // Try to auto-install AL CLI
-      this.installationInProgress = true;
-      
-      try {
-        const installResult = await this.installALCli();
-        if (installResult.success) {
-          // Wait a moment for the installation to settle
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
-          const newPath = await this.findExistingAL();
-          if (newPath) {
-            return {
-              success: true,
-              alPath: newPath,
-              message: `AL CLI successfully auto-installed at ${newPath}`
-            };
-          } else {
-            return {
-              success: false,
-              message: 'Installation succeeded but AL CLI not found afterwards. May need manual PATH configuration.',
-              requiresManualInstall: true
-            };
-          }
+      const installResult = await this.installALCli();
+      if (installResult.success) {
+        // Wait a moment for the installation to settle
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        const newPath = await this.findExistingAL();
+        if (newPath) {
+          return {
+            success: true,
+            alPath: newPath,
+            message: `AL CLI successfully auto-installed at ${newPath}`
+          };
         } else {
           return {
             success: false,
-            message: `Auto-installation failed: ${installResult.message}`,
+            message: 'Installation succeeded but AL CLI not found afterwards. May need manual PATH configuration.',
             requiresManualInstall: true
           };
         }
-      } finally {
-        this.installationInProgress = false;
+      } else {
+        return {
+          success: false,
+          message: `Auto-installation failed: ${installResult.message}`,
+          requiresManualInstall: true
+        };
       }
     } catch (error) {
-      this.installationInProgress = false;
       const errorMessage = error instanceof Error ? error.message : String(error);
       return {
         success: false,
         message: `Auto-installation error: ${errorMessage}`,
         requiresManualInstall: true
       };
+    } finally {
+      this.installationInProgress = false;
     }
   }
 
