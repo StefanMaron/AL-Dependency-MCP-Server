@@ -28,12 +28,39 @@ export class ALMCPTools {
   ) {}
 
   /**
+   * Check if database is empty and return guidance message if needed
+   */
+  private checkDatabaseLoaded(): { isEmpty: boolean; message?: string } {
+    const stats = this.database.getStatistics();
+    if (stats.totalObjects === 0) {
+      return {
+        isEmpty: true,
+        message: `No AL packages are currently loaded. To analyze AL objects, first load packages from your project directory using:
+
+1. **Auto-discover from project root**: Use 'al_auto_discover' tool with your AL project root directory path (the folder containing .alpackages/ or app.json)
+2. **Load from specific directory**: Use 'al_load_packages' tool with the path to your .alpackages directory
+
+Example: If your AL project is in "/path/to/my-al-project", call al_auto_discover with rootPath="/path/to/my-al-project"
+
+Once packages are loaded, you can search for AL objects like Customer table, Sales-Post codeunit, etc.`
+      };
+    }
+    return { isEmpty: false };
+  }
+
+  /**
    * Search AL objects across all loaded packages
    */
   async searchObjects(args: SearchObjectsArgs): Promise<SearchObjectsResult> {
     const startTime = Date.now();
     
     try {
+      // Check if database has packages loaded
+      const dbCheck = this.checkDatabaseLoaded();
+      if (dbCheck.isEmpty) {
+        throw new Error(dbCheck.message!);
+      }
+
       // Set default limits to prevent massive responses
       const limit = args.limit || 20; // Reduced from unlimited to 20
       const offset = args.offset || 0;
@@ -126,6 +153,12 @@ export class ALMCPTools {
     const startTime = Date.now();
     
     try {
+      // Check if database has packages loaded
+      const dbCheck = this.checkDatabaseLoaded();
+      if (dbCheck.isEmpty) {
+        throw new Error(dbCheck.message!);
+      }
+
       let object: any;
       
       // Support both objectId and objectName lookup
@@ -492,6 +525,12 @@ export class ALMCPTools {
     const startTime = Date.now();
     
     try {
+      // Check if database has packages loaded
+      const dbCheck = this.checkDatabaseLoaded();
+      if (dbCheck.isEmpty) {
+        throw new Error(dbCheck.message!);
+      }
+
       const limit = args.limit || 20;
       const offset = args.offset || 0;
       const includeDetails = args.includeDetails !== false;
