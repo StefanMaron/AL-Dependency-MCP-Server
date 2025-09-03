@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.2] - 2025-09-03
+
+### Added
+- add badges for npm version, CI status, license, Node.js, .NET, and MCP compatibility to README
+- update README with additional prerequisites and setup verification steps #8
+
+### Fixed
+- resolve race condition in concurrent AL installer test
+
 ## [2.1.1] - 2025-09-03
 
 ### Fixed
