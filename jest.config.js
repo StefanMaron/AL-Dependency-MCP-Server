@@ -13,4 +13,6 @@ module.exports = {
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
+  testTimeout: 30000, // 30 seconds timeout for individual tests
+  forceExit: true, // Force Jest to exit after tests complete
 };

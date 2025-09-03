@@ -43,6 +43,11 @@ function createMockProcess(closeCode: number = 0, outputData: string = '') {
     });
   }
   
+  // Mock kill method to mark process as killed
+  mockProc.kill.mockImplementation(() => {
+    mockProc.killed = true;
+  });
+  
   return mockProc;
 }
 
@@ -546,6 +551,7 @@ describe('ALInstaller', () => {
   describe('concurrent installation prevention', () => {
     it('should prevent concurrent installations', async () => {
       const concurrentInstaller = new ALInstaller();
+      let installationCallCount = 0;
       
       mockSpawn.mockImplementation((command: string, args?: readonly string[]) => {
         if (command === 'AL') {
@@ -553,17 +559,23 @@ describe('ALInstaller', () => {
         } else if (command === 'dotnet' && args?.[0] === '--version') {
           return createMockProcess(0) as any;
         } else if (command === 'dotnet' && args?.includes('install')) {
-          // Make installation take some time to allow concurrent check to work
+          installationCallCount++;
+          // Make installation take longer to ensure the second call gets blocked
           const mockProc = {
             stdout: { on: jest.fn() },
             stderr: { on: jest.fn() },
             on: jest.fn(),
-            kill: jest.fn()
+            kill: jest.fn(),
+            killed: false
           };
           mockProc.on.mockImplementation((event: string, callback: Function) => {
             if (event === 'close') {
-              setTimeout(() => callback(0), 50); // Small delay
+              // Use a longer delay to ensure the second call gets properly blocked
+              setTimeout(() => callback(0), 200);
             }
+          });
+          mockProc.kill.mockImplementation(() => {
+            mockProc.killed = true;
           });
           return mockProc as any;
         }
@@ -573,18 +585,22 @@ describe('ALInstaller', () => {
       // Start first installation
       const promise1 = concurrentInstaller.ensureALAvailable();
       
-      // Wait a tiny bit then start second - should be blocked
-      await new Promise(resolve => setTimeout(resolve, 5));
+      // Wait a short time then start second - should be blocked immediately
+      await new Promise(resolve => setTimeout(resolve, 10));
       const promise2 = concurrentInstaller.ensureALAvailable();
       
-      const [_result1, result2] = await Promise.all([promise1, promise2]);
+      const [result1, result2] = await Promise.all([promise1, promise2]);
 
-      // Second call should be prevented from running
-      const blockedResult = result2;
+      // First installation should proceed (even if it fails to find AL afterwards)
+      expect(result1.success).toBe(false); // Will fail because AL is still not found after installation
       
-      expect(blockedResult.success).toBe(false);
-      expect(blockedResult.message).toContain('Another installation is already in progress');
-      expect(blockedResult.requiresManualInstall).toBe(false);
+      // Second call should be prevented from running
+      expect(result2.success).toBe(false);
+      expect(result2.message).toContain('Another installation is already in progress');
+      expect(result2.requiresManualInstall).toBe(false);
+      
+      // Only one installation should have been attempted
+      expect(installationCallCount).toBe(1);
     });
   });
 
