@@ -1,5 +1,12 @@
 # AL MCP Server
 
+[![npm version](https://badge.fury.io/js/al-mcp-server.svg)](https://badge.fury.io/js/al-mcp-server)
+[![CI](https://github.com/StefanMaron/AL-Dependency-MCP-Server/actions/workflows/ci.yml/badge.svg)](https://github.com/StefanMaron/AL-Dependency-MCP-Server/actions/workflows/ci.yml)
+[![MIT License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org/)
+[![.NET](https://img.shields.io/badge/.NET-8.0+-blue.svg)](https://dotnet.microsoft.com/)
+[![MCP Compatible](https://img.shields.io/badge/MCP-Compatible-orange.svg)](https://modelcontextprotocol.io/)
+
 **Bridge the gap between AL development and AI coding assistance.**
 
 ## The Problem This Solves
