@@ -30,7 +30,18 @@ This MCP (Model Context Protocol) server exposes compiled AL packages (.app file
 
 ### Step 1: Install Prerequisites
 - **Node.js 18+** ([download here](https://nodejs.org/))
+- **.NET SDK 8.0+** ([download here](https://dotnet.microsoft.com/download)) - Required for AL CLI tools
+- **NuGet package source** - Ensure nuget.org is configured (usually automatic)
 - **Compiled AL packages** (.app files in .alpackages directory)
+
+**Verify your setup:**
+```bash
+# Check .NET version (should be 8.0 or higher)
+dotnet --version
+
+# Check NuGet sources (should include nuget.org)
+dotnet nuget list source
+```
 
 **That's it!** The AL MCP Server installs automatically via `npx` - no manual installation needed.
 
@@ -162,6 +173,8 @@ Once configured, your AI assistant gains complete visibility into your AL enviro
 **What You Need:**
 - AL workspace with compiled .app packages (in `.alpackages` directory)
 - Node.js 18+ installed
+- .NET SDK 8.0+ installed
+- NuGet package source configured (nuget.org)
 - Any MCP-compatible AI assistant
 
 **What Gets Installed Automatically:**
@@ -174,7 +187,10 @@ The server analyzes **compiled AL symbols**, not raw .al source files.
 
 **Common Issues:**
 
-- **"AL CLI not found"** - The server auto-installs AL tools, but may require .NET SDK
+- **"AL CLI not found"** - The server auto-installs AL tools, but requires .NET SDK 8.0+
+- **NU1100 error** - Update to .NET SDK 8.0+ or configure NuGet sources: `dotnet nuget add source https://api.nuget.org/v3/index.json -n nuget.org`
+- **"No sources found"** - Configure NuGet source: `dotnet nuget list source` should show nuget.org
+- **"supports: net8.0" error** - Install .NET SDK 8.0 or higher (earlier versions are incompatible)
 - **"No packages found"** - Ensure you have `.app` files in `.alpackages` directory 
 - **"Server not responding"** - Check that Node.js 18+ is installed and accessible
 
