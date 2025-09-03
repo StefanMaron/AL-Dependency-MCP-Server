@@ -626,35 +626,13 @@ export class ALMCPServer {
 
   private async performInitialization(): Promise<void> {
     try {
-      console.error('🔍 Auto-loading AL packages...');
+      console.error('🔍 Setting up AL MCP Server...');
       
       // Setup AL CLI
       await this.setupALCli();
 
-      // Try to auto-discover AL packages in current working directory only
-      const searchPaths = [
-        process.cwd() // Current working directory only
-      ];
-
-      let packagesLoaded = false;
-      
-      for (const searchPath of searchPaths) {
-        try {
-          const result = await this.tools.autoDiscoverPackages(searchPath);
-          if (result.packages.length > 0) {
-            console.error(`✅ Auto-loaded ${result.packages.length} AL packages from ${searchPath}`);
-            packagesLoaded = true;
-            break;
-          }
-        } catch (error) {
-          // Continue to next search path
-          continue;
-        }
-      }
-
-      if (!packagesLoaded) {
-        console.error('⚠️  No AL packages found in common locations. Use al_load_packages to load from specific directory.');
-      }
+      // No automatic package loading - require explicit tool calls
+      console.error('✅ AL MCP Server ready. Use al_auto_discover or al_load_packages to load AL symbols before searching.');
 
       this.isInitialized = true;
     } catch (error) {

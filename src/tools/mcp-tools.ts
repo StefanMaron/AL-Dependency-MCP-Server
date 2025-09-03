@@ -345,6 +345,7 @@ Once packages are loaded, you can search for AL objects like Customer table, Sal
     }
   }
 
+
   /**
    * Get database statistics
    */
