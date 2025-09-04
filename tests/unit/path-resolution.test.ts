@@ -22,8 +22,8 @@ describe('Cross-Platform Path Resolution', () => {
       // Should be absolute path
       expect(path.isAbsolute(cwd)).toBe(true);
       
-      // Should end with project directory name
-      expect(cwd).toMatch(/al-mcp-server$/);
+      // Should end with project directory name (handles both local and CI naming)
+      expect(cwd).toMatch(/(al-mcp-server|AL-Dependency-MCP-Server)$/);
       
       // Should be accessible
       expect(() => process.chdir(cwd)).not.toThrow();
