@@ -47,8 +47,8 @@ describe('MCP Server Working Directory Behavior', () => {
         const currentCwd = process.cwd();
         console.log('When started from project dir, cwd is:', currentCwd);
         
-        // This would work correctly
-        expect(currentCwd).toBe(projectDir);
+        // This would work correctly (normalize paths for macOS)
+        expect(path.resolve(currentCwd)).toBe(path.resolve(projectDir));
         
         // Relative paths would resolve correctly
         const relativePath = "./.alpackages";
@@ -74,16 +74,16 @@ describe('MCP Server Working Directory Behavior', () => {
         const currentCwd = process.cwd();
         console.log('When started from different dir, cwd is:', currentCwd);
         
-        expect(currentCwd).toBe(differentDir);
-        expect(currentCwd).not.toBe(projectDir);
+        expect(path.resolve(currentCwd)).toBe(path.resolve(differentDir));
+        expect(path.resolve(currentCwd)).not.toBe(path.resolve(projectDir));
         
         // Now if the user calls al_auto_discover with rootPath="."
         const rootPath = ".";
         const resolvedRoot = path.resolve(rootPath);
         
         // This would resolve to the wrong directory!
-        expect(resolvedRoot).toBe(differentDir);
-        expect(resolvedRoot).not.toBe(projectDir);
+        expect(path.resolve(resolvedRoot)).toBe(path.resolve(differentDir));
+        expect(path.resolve(resolvedRoot)).not.toBe(path.resolve(projectDir));
         
         // Relative paths would fail
         const relativePath = "./.alpackages";
@@ -165,8 +165,8 @@ describe('MCP Server Working Directory Behavior', () => {
             console.log('--- Test 1: Started from project dir with rootPath="." ---');
             console.log(output1);
             
-            expect(output1).toContain(`STARTED_FROM: ${projectDir}`);
-            expect(output1).toContain(`RESOLVED_ROOT: ${projectDir}`);
+            expect(output1).toMatch(new RegExp(`STARTED_FROM: ${projectDir.replace(/[/\\]/g, '[/\\\\]')}`));
+            expect(output1).toMatch(new RegExp(`RESOLVED_ROOT: ${projectDir.replace(/[/\\]/g, '[/\\\\]')}`));
             expect(output1).toContain('ALPACKAGES_EXISTS: true');
             
             // Test 2: Start from different directory with rootPath="."
@@ -182,8 +182,8 @@ describe('MCP Server Working Directory Behavior', () => {
               console.log('--- Test 2: Started from different dir with rootPath="." ---');
               console.log(output2);
               
-              expect(output2).toContain(`STARTED_FROM: ${differentDir}`);
-              expect(output2).toContain(`RESOLVED_ROOT: ${differentDir}`);
+              expect(output2).toMatch(new RegExp(`STARTED_FROM: ${differentDir.replace(/[/\\]/g, '[/\\\\]')}`));
+              expect(output2).toMatch(new RegExp(`RESOLVED_ROOT: ${differentDir.replace(/[/\\]/g, '[/\\\\]')}`));
               expect(output2).toContain('ALPACKAGES_EXISTS: false'); // Should fail!
               
               // Test 3: Start from different directory with correct absolute path
@@ -199,8 +199,8 @@ describe('MCP Server Working Directory Behavior', () => {
                 console.log('--- Test 3: Started from different dir with correct absolute path ---');
                 console.log(output3);
                 
-                expect(output3).toContain(`STARTED_FROM: ${differentDir}`);
-                expect(output3).toContain(`RESOLVED_ROOT: ${projectDir}`);
+                expect(output3).toMatch(new RegExp(`STARTED_FROM: ${differentDir.replace(/[/\\]/g, '[/\\\\]')}`));
+                expect(output3).toMatch(new RegExp(`RESOLVED_ROOT: ${projectDir.replace(/[/\\]/g, '[/\\\\]')}`));
                 expect(output3).toContain('ALPACKAGES_EXISTS: true'); // Should work!
                 
                 done();
