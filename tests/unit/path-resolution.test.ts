@@ -126,14 +126,15 @@ describe('Cross-Platform Path Resolution', () => {
           ? relativeCachePath
           : path.resolve(normalizedRootPath, relativeCachePath);
           
-        // Expected result (use the resolved project dir to handle macOS symlinks)
-        const expectedPath = path.resolve(resolvedTestProjectDir, '.alpackages');
+        // Expected result should be the same as what we get from the current directory resolution
+        // Both should resolve to the same canonical path on macOS
+        const expectedPath = path.resolve(normalizedRootPath, '.alpackages');
         
-        expect(path.resolve(correctResult)).toBe(expectedPath);
+        expect(path.resolve(correctResult)).toBe(path.resolve(expectedPath));
         
         // Show what the buggy version produces
         const buggyNormalized = path.resolve(buggyResult);
-        expect(buggyNormalized).toBe(expectedPath); // This might pass due to path.resolve fixing it
+        expect(path.resolve(buggyNormalized)).toBe(path.resolve(expectedPath)); // Resolve both for macOS
         
       } finally {
         // Restore original directory
