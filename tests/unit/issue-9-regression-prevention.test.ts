@@ -213,7 +213,8 @@ describe('Issue #9 Regression Prevention', () => {
    * This is a meta-test to ensure we don't accidentally reintroduce the bug
    */
   it('DOCUMENTATION: path.resolve() vs path.join() behavior difference', () => {
-    const absoluteRoot = '/project/root';
+    // Use platform-appropriate absolute path for cross-platform compatibility
+    const absoluteRoot = process.platform === 'win32' ? 'C:\\project\\root' : '/project/root';
     const relativePath = './.alpackages';
     
     // Show the difference that caused Issue #9
@@ -225,7 +226,7 @@ describe('Issue #9 Regression Prevention', () => {
     console.log(`  path.resolve("${absoluteRoot}", "${relativePath}") = ${resolveResult}`);
     
     // Both give same result for absolute paths, but resolve is safer
-    expect(joinResult).toBe(resolveResult);
+    expect(path.normalize(joinResult)).toBe(path.normalize(resolveResult));
     expect(path.isAbsolute(resolveResult)).toBe(true);
     
     // The real issue was when rootPath was "." (relative)
