@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.3] - 2025-09-04
+
+### Added
+- add comprehensive regression prevention tests for Issue #9
+- add guideline for issue mentions in commit messages
+
+### Fixed
+- Windows path compatibility in cross-platform path tests
+- bulletproof macOS path resolution in tests with path.resolve()
+- complete macOS symlink resolution in path tests
+- resolve macOS symlink path compatibility in tests
+- update path test to handle CI directory naming
+- remove problematic subprocess test causing CI hangs
+- resolve test failures on macOS due to path resolution (#9)
+- resolve relative path resolution in VS Code settings (closes #9)
+
 ## [2.1.2] - 2025-09-03
 
 ### Added
