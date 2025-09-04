@@ -107,7 +107,9 @@ describe('Cross-Platform Path Resolution', () => {
       
       try {
         // Change to test project directory to simulate VS Code/Copilot behavior
-        process.chdir(testProjectDir);
+        // Resolve to handle macOS symlinks consistently
+        const resolvedTestProjectDir = path.resolve(testProjectDir);
+        process.chdir(resolvedTestProjectDir);
         
         // Now test what happens when rootPath is "."
         const rootPath = ".";
@@ -124,8 +126,8 @@ describe('Cross-Platform Path Resolution', () => {
           ? relativeCachePath
           : path.resolve(normalizedRootPath, relativeCachePath);
           
-        // Expected result (resolve to handle macOS symlinks)
-        const expectedPath = path.resolve(testProjectDir, '.alpackages');
+        // Expected result (use the resolved project dir to handle macOS symlinks)
+        const expectedPath = path.resolve(resolvedTestProjectDir, '.alpackages');
         
         expect(path.resolve(correctResult)).toBe(expectedPath);
         
