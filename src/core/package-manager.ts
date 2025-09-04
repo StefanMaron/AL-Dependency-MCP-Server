@@ -44,10 +44,6 @@ export class ALPackageManager {
     const includePatterns = options.includePatterns || ['**/*.app'];
     const excludePatterns = options.excludePatterns || ['**/.*', '**/node_modules/**'];
 
-    const searchPath = options.recursive 
-      ? path.join(options.packagesPath, '**/*.app')
-      : path.join(options.packagesPath, '*.app');
-
     const appFiles = await glob.glob(includePatterns, {
       cwd: options.packagesPath,
       absolute: true,
@@ -192,7 +188,7 @@ export class ALPackageManager {
     
     // This is a simplified version - in a full implementation,
     // we'd store the full package info alongside the objects
-    for (const [packageName, objectCount] of packageSummary) {
+    for (const [packageName] of packageSummary) {
       packages.push({
         name: packageName,
         id: '', // Would need to be stored during loading
@@ -210,6 +206,15 @@ export class ALPackageManager {
    * Find .alpackages directories and AL project directories automatically
    */
   async autoDiscoverPackageDirectories(rootPath: string, maxDepth: number = 2): Promise<string[]> {
+    // Validate rootPath to prevent common issues
+    if (!rootPath) {
+      throw new Error('rootPath is required and cannot be empty. Please provide the absolute path to your AL project directory.');
+    }
+    
+    if (!path.isAbsolute(rootPath)) {
+      throw new Error(`rootPath must be an absolute path. Received: "${rootPath}". Example: "/path/to/your/al-project" or "C:\\path\\to\\your\\al-project"`);
+    }
+
     const packageDirs: string[] = [];
     
     // First, try to find .alpackages directories
@@ -329,7 +334,7 @@ export class ALPackageManager {
         // Resolve relative paths relative to workspace root
         const resolvedPath = path.isAbsolute(workspaceCachePath) 
           ? workspaceCachePath 
-          : path.join(rootPath, workspaceCachePath);
+          : path.resolve(rootPath, workspaceCachePath);
         customPaths.push(resolvedPath);
       }
 
@@ -344,7 +349,7 @@ export class ALPackageManager {
         if (folderCachePath && folderCachePath !== workspaceCachePath) {
           const resolvedPath = path.isAbsolute(folderCachePath)
             ? folderCachePath
-            : path.join(currentDir, folderCachePath);
+            : path.resolve(currentDir, folderCachePath);
           customPaths.push(resolvedPath);
         }
         currentDir = path.dirname(currentDir);

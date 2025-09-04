@@ -203,16 +203,16 @@ export class ALMCPServer {
           },
           {
             name: 'al_auto_discover',
-            description: 'Auto-discover and load AL packages from .alpackages directories',
+            description: 'Auto-discover and load AL packages from .alpackages directories. Requires absolute path to AL project directory.',
             inputSchema: {
               type: 'object',
               properties: {
                 rootPath: {
                   type: 'string',
-                  description: 'Root path to search for .alpackages directories',
-                  default: '.',
+                  description: 'Absolute path to your AL project directory (e.g., "/path/to/my-al-project" or "C:\\path\\to\\my-al-project"). This supports relative paths in VS Code settings like "./.alpackages".',
                 },
               },
+              required: ['rootPath'],
             },
           },
           {
@@ -480,11 +480,26 @@ export class ALMCPServer {
             };
 
           case 'al_auto_discover':
+            const rootPath = args && (args as any).rootPath;
+            if (!rootPath) {
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify({ 
+                      error: 'rootPath parameter is required',
+                      message: 'Please provide the absolute path to your AL project directory.',
+                      example: 'al_auto_discover with rootPath="/path/to/your/al-project"'
+                    }, null, 2),
+                  },
+                ],
+              };
+            }
             return {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify(await this.tools.autoDiscoverPackages((args && (args as any).rootPath) || '.'), null, 2),
+                  text: JSON.stringify(await this.tools.autoDiscoverPackages(rootPath), null, 2),
                 },
               ],
             };

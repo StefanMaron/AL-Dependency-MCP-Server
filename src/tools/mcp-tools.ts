@@ -37,10 +37,12 @@ export class ALMCPTools {
         isEmpty: true,
         message: `No AL packages are currently loaded. To analyze AL objects, first load packages from your project directory using:
 
-1. **Auto-discover from project root**: Use 'al_auto_discover' tool with your AL project root directory path (the folder containing .alpackages/ or app.json)
+1. **Auto-discover from project root**: Use 'al_auto_discover' tool with the ABSOLUTE path to your AL project directory (the folder containing .alpackages/ or app.json)
 2. **Load from specific directory**: Use 'al_load_packages' tool with the path to your .alpackages directory
 
 Example: If your AL project is in "/path/to/my-al-project", call al_auto_discover with rootPath="/path/to/my-al-project"
+
+IMPORTANT: rootPath must be an absolute path like "/path/to/project" or "C:\\path\\to\\project". Relative paths like "." or "./project" are not supported. This ensures VS Code settings with relative paths like "./.alpackages" work correctly.
 
 Once packages are loaded, you can search for AL objects like Customer table, Sales-Post codeunit, etc.`
       };
