@@ -182,3 +182,4 @@ To use an agent, reference it in your Claude Code session when working on relate
 - Package discovery is intentionally limited to prevent system-wide disk scanning
 - All responses are JSON-formatted for MCP protocol compatibility
 - Error handling preserves server functionality even when AL tools are unavailable
+- Just mention issues in the commit message, never close them
