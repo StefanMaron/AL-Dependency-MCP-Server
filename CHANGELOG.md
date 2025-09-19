@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.4] - 2025-09-19
+
+### Added
+- comprehensive AL reference tracking with field-level analysis
+
 ## [2.1.3] - 2025-09-04
 
 ### Added
