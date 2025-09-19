@@ -1,12 +1,17 @@
-import { 
-  ALObject, 
-  ALSymbolDatabase, 
-  ALReference, 
-  ALField, 
+import {
+  ALObject,
+  ALSymbolDatabase,
+  ALReference,
+  ALFieldReference,
+  ALField,
   ALProcedure,
   ALTable,
   ALPage,
-  ALCodeunit
+  ALCodeunit,
+  ALReport,
+  ALControl,
+  ALDataItem,
+  ALProperty
 } from '../types/al-types';
 
 export class OptimizedSymbolDatabase implements ALSymbolDatabase {
@@ -20,6 +25,11 @@ export class OptimizedSymbolDatabase implements ALSymbolDatabase {
   private fieldsByTable = new Map<string, ALField[]>();
   private proceduresByObject = new Map<string, ALProcedure[]>();
   private extensionsByBase = new Map<string, ALObject[]>();
+
+  // Field reference indices
+  private fieldReferencesByTarget = new Map<string, ALFieldReference[]>(); // tableName.fieldName -> references
+  private fieldReferencesBySource = new Map<string, ALFieldReference[]>(); // sourceObjectId -> references
+  private allFieldReferences: ALFieldReference[] = [];
 
   // Package-level indices
   private packageObjects = new Map<string, Set<string>>();
@@ -52,6 +62,9 @@ export class OptimizedSymbolDatabase implements ALSymbolDatabase {
 
     // Type-specific indexing
     this.indexTypeSpecificData(object);
+
+    // Extract field references from this object
+    this.extractFieldReferences(object);
 
     this.objectCount++;
   }
@@ -120,6 +133,13 @@ export class OptimizedSymbolDatabase implements ALSymbolDatabase {
    */
   getAllObjects(): ALObject[] {
     return this.allObjects;
+  }
+
+  /**
+   * Get all field references (for enumeration and debugging)
+   */
+  getAllFieldReferences(): ALFieldReference[] {
+    return this.allFieldReferences;
   }
 
   /**
@@ -240,6 +260,32 @@ export class OptimizedSymbolDatabase implements ALSymbolDatabase {
   }
 
   /**
+   * Find field references - all references to a specific table/field
+   */
+  findFieldReferences(tableName: string, fieldName?: string): ALFieldReference[] {
+    if (fieldName) {
+      const key = `${tableName}.${fieldName}`;
+      return this.fieldReferencesByTarget.get(key) || [];
+    } else {
+      // Return all field references for the table
+      const allRefs: ALFieldReference[] = [];
+      for (const [key, refs] of this.fieldReferencesByTarget) {
+        if (key.startsWith(`${tableName}.`)) {
+          allRefs.push(...refs);
+        }
+      }
+      return allRefs;
+    }
+  }
+
+  /**
+   * Find field usage - where a specific field is used
+   */
+  findFieldUsage(tableName: string, fieldName: string): ALFieldReference[] {
+    return this.findFieldReferences(tableName, fieldName);
+  }
+
+  /**
    * Clear all data
    */
   clear(): void {
@@ -252,6 +298,9 @@ export class OptimizedSymbolDatabase implements ALSymbolDatabase {
     this.extensionsByBase.clear();
     this.packageObjects.clear();
     this.dependencyGraph.clear();
+    this.fieldReferencesByTarget.clear();
+    this.fieldReferencesBySource.clear();
+    this.allFieldReferences = [];
     this.objectCount = 0;
   }
 
@@ -336,8 +385,8 @@ export class OptimizedSymbolDatabase implements ALSymbolDatabase {
       if (table.Fields) {
         for (const field of table.Fields) {
           const tableRelationProperty = field.Properties?.find(p => p.Name === 'TableRelation');
-          if (tableRelationProperty && 
-              typeof tableRelationProperty.Value === 'string' && 
+          if (tableRelationProperty &&
+              typeof tableRelationProperty.Value === 'string' &&
               tableRelationProperty.Value.includes(targetName)) {
             references.push({
               sourceName: `${sourceObject.Name}.${field.Name}`,
@@ -352,7 +401,459 @@ export class OptimizedSymbolDatabase implements ALSymbolDatabase {
       }
     }
 
+    // Check global variables for object references
+    if ((sourceObject as any).Variables) {
+      for (const variable of (sourceObject as any).Variables) {
+        if (variable.TypeDefinition) {
+          const typeDef = variable.TypeDefinition;
+          const objectTypeName = this.extractObjectTypeReference(typeDef, targetName);
+          if (objectTypeName) {
+            references.push({
+              sourceName: sourceObject.Name,
+              sourceType: sourceObject.Type,
+              targetName,
+              targetType: objectTypeName.type,
+              referenceType: 'variable',
+              packageName: sourceObject.PackageName,
+              details: `Variable: ${variable.Name}`
+            });
+          }
+        }
+      }
+    }
+
+    // Check procedure parameters and return types for object references
+    if ((sourceObject as any).Procedures) {
+      for (const procedure of (sourceObject as any).Procedures) {
+        // Check parameters
+        if (procedure.Parameters) {
+          for (const param of procedure.Parameters) {
+            if (param.TypeDefinition) {
+              const objectTypeName = this.extractObjectTypeReference(param.TypeDefinition, targetName);
+              if (objectTypeName) {
+                references.push({
+                  sourceName: sourceObject.Name,
+                  sourceType: sourceObject.Type,
+                  targetName,
+                  targetType: objectTypeName.type,
+                  referenceType: 'parameter',
+                  packageName: sourceObject.PackageName,
+                  details: `Procedure: ${procedure.Name}, Parameter: ${param.Name}`
+                });
+              }
+            }
+          }
+        }
+
+        // Check return type
+        if (procedure.ReturnTypeDefinition) {
+          const objectTypeName = this.extractObjectTypeReference(procedure.ReturnTypeDefinition, targetName);
+          if (objectTypeName) {
+            references.push({
+              sourceName: sourceObject.Name,
+              sourceType: sourceObject.Type,
+              targetName,
+              targetType: objectTypeName.type,
+              referenceType: 'return_type',
+              packageName: sourceObject.PackageName,
+              details: `Procedure: ${procedure.Name}, Return Type`
+            });
+          }
+        }
+      }
+    }
+
     return references;
+  }
+
+  /**
+   * Extract object type reference from TypeDefinition
+   */
+  private extractObjectTypeReference(typeDef: any, targetName: string): { type: string } | null {
+    if (!typeDef || !typeDef.Name) return null;
+
+    // Check for direct object types with subtypes
+    const objectTypes = ['Record', 'Codeunit', 'Page', 'Report', 'Query', 'XmlPort', 'Enum'];
+    if (objectTypes.includes(typeDef.Name)) {
+      // Get the subtype reference
+      let subtypeRef: string | null = null;
+
+      if (typeDef.SubtypeDefinition) {
+        subtypeRef = typeDef.SubtypeDefinition;
+      } else if (typeDef.Subtype) {
+        if (typeof typeDef.Subtype === 'string') {
+          subtypeRef = typeDef.Subtype;
+        } else if (typeDef.Subtype.Name) {
+          subtypeRef = typeDef.Subtype.Name;
+        } else if (typeDef.Subtype.Id) {
+          // Try to resolve ID to name
+          const objectKey = `${this.mapTypeToObjectType(typeDef.Name)}:${typeDef.Subtype.Id}`;
+          const referencedObject = this.objectsById.get(objectKey);
+          if (referencedObject) {
+            subtypeRef = referencedObject.Name;
+          }
+        }
+      }
+
+      // Check if this subtype matches our target
+      if (subtypeRef === targetName) {
+        return { type: this.mapTypeToObjectType(typeDef.Name) };
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Map TypeDefinition.Name to AL object type
+   */
+  private mapTypeToObjectType(typeName: string): string {
+    switch (typeName) {
+      case 'Record': return 'Table';
+      case 'Codeunit': return 'Codeunit';
+      case 'Page': return 'Page';
+      case 'Report': return 'Report';
+      case 'Query': return 'Query';
+      case 'XmlPort': return 'XmlPort';
+      case 'Enum': return 'Enum';
+      default: return typeName;
+    }
+  }
+
+  /**
+   * Extract field references from an AL object
+   */
+  private extractFieldReferences(object: ALObject): void {
+    const objectId = `${object.Type}:${object.Id}`;
+
+    switch (object.Type) {
+      case 'Page':
+        this.extractPageFieldReferences(object as ALPage, objectId);
+        break;
+      case 'Report':
+        this.extractReportFieldReferences(object as ALReport, objectId);
+        break;
+      case 'Query':
+        this.extractQueryFieldReferences(object as any, objectId);
+        break;
+      case 'XmlPort':
+        this.extractXmlPortFieldReferences(object as any, objectId);
+        break;
+      case 'Table':
+        this.extractTableFieldReferences(object as ALTable, objectId);
+        break;
+      // Note: Codeunit field references would require parsing procedure bodies
+      // which may not be available in compiled symbols
+    }
+  }
+
+  /**
+   * Extract field references from page controls
+   */
+  private extractPageFieldReferences(page: ALPage, objectId: string): void {
+    if (!page.Controls) return;
+
+    const sourceTable = this.getPageSourceTable(page);
+    if (!sourceTable) return;
+
+    this.extractControlFieldReferences(page.Controls, sourceTable, objectId, page.Name, page.PackageName);
+  }
+
+  /**
+   * Recursively extract field references from controls
+   */
+  private extractControlFieldReferences(controls: ALControl[], sourceTable: string, objectId: string, objectName: string, packageName?: string): void {
+    for (const control of controls) {
+      // Check SourceExpression property for field references
+      const sourceExpr = this.getPropertyValue(control.Properties, 'SourceExpression') ||
+                        this.getPropertyValue(control.Properties, 'SourceExpr') ||
+                        control.SourceExpr;
+      if (sourceExpr && typeof sourceExpr === 'string') {
+        const fieldName = this.parseFieldFromExpression(sourceExpr);
+        if (fieldName) {
+          this.addFieldReference({
+            sourceObjectId: objectId,
+            sourceObjectName: objectName,
+            sourceObjectType: 'Page',
+            targetTableName: sourceTable,
+            targetFieldName: fieldName,
+            referenceType: 'field_usage',
+            context: {
+              controlName: control.Name,
+              propertyName: 'SourceExpression',
+              expression: sourceExpr
+            },
+            packageName
+          });
+        }
+      }
+
+      // Process nested controls
+      if (control.Controls) {
+        this.extractControlFieldReferences(control.Controls, sourceTable, objectId, objectName, packageName);
+      }
+    }
+  }
+
+  /**
+   * Extract field references from report data items and columns
+   */
+  private extractReportFieldReferences(report: ALReport, objectId: string): void {
+    if (!report.Dataset) return;
+
+    for (const dataItem of report.Dataset) {
+      if (dataItem.SourceTable) {
+        let foundColumnReferences = false;
+
+        // Extract column references - only use SourceExpr if explicitly provided
+        if ('Columns' in dataItem && (dataItem as any).Columns) {
+          for (const column of (dataItem as any).Columns) {
+            const sourceExpr = column.SourceExpr || column.SourceExpression;
+            if (sourceExpr && typeof sourceExpr === 'string' && sourceExpr !== 'none') {
+              const fieldName = this.parseFieldFromExpression(sourceExpr);
+              if (fieldName) {
+                foundColumnReferences = true;
+                this.addFieldReference({
+                  sourceObjectId: objectId,
+                  sourceObjectName: report.Name,
+                  sourceObjectType: 'Report',
+                  targetTableName: dataItem.SourceTable,
+                  targetFieldName: fieldName,
+                  referenceType: 'field_usage',
+                  context: {
+                    dataItemName: dataItem.Name,
+                    propertyName: 'SourceExpression',
+                    expression: sourceExpr
+                  },
+                  packageName: report.PackageName
+                });
+              }
+            }
+          }
+        }
+
+        // If no specific column references found, but report uses the table,
+        // it still has access to all table fields - this is useful information
+        if (!foundColumnReferences) {
+          this.addFieldReference({
+            sourceObjectId: objectId,
+            sourceObjectName: report.Name,
+            sourceObjectType: 'Report',
+            targetTableName: dataItem.SourceTable,
+            targetFieldName: '*', // Indicates access to all fields
+            referenceType: 'table_usage',
+            context: {
+              dataItemName: dataItem.Name,
+              propertyName: 'SourceTable',
+              expression: dataItem.SourceTable
+            },
+            packageName: report.PackageName
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Extract field references from query data items and columns
+   */
+  private extractQueryFieldReferences(query: any, objectId: string): void {
+    // Check for DataItems in query
+    if (query.DataItems) {
+      for (const dataItem of query.DataItems) {
+        if (dataItem.DataItemTable) {
+          this.addFieldReference({
+            sourceObjectId: objectId,
+            sourceObjectName: query.Name,
+            sourceObjectType: 'Query',
+            targetTableName: dataItem.DataItemTable,
+            targetFieldName: '*',
+            referenceType: 'table_usage',
+            context: {
+              dataItemName: dataItem.Name,
+              propertyName: 'DataItemTable',
+              expression: dataItem.DataItemTable
+            },
+            packageName: query.PackageName
+          });
+        }
+      }
+    }
+
+    // Check for Columns in query
+    if (query.Columns) {
+      for (const column of query.Columns) {
+        if (column.DataSource) {
+          // DataSource format is typically "DataItem.FieldName"
+          const parts = column.DataSource.split('.');
+          if (parts.length === 2) {
+            const fieldName = parts[1];
+            // Try to find which data item this refers to
+            if (query.DataItems) {
+              const dataItem = query.DataItems.find((di: any) => di.Name === parts[0]);
+              if (dataItem && dataItem.DataItemTable) {
+                this.addFieldReference({
+                  sourceObjectId: objectId,
+                  sourceObjectName: query.Name,
+                  sourceObjectType: 'Query',
+                  targetTableName: dataItem.DataItemTable,
+                  targetFieldName: fieldName,
+                  referenceType: 'field_usage',
+                  context: {
+                    dataItemName: parts[0],
+                    propertyName: 'DataSource',
+                    expression: column.DataSource
+                  },
+                  packageName: query.PackageName
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Extract field references from XMLPort schema elements
+   */
+  private extractXmlPortFieldReferences(xmlport: any, objectId: string): void {
+    // Check for Schema elements in XMLPort
+    if (xmlport.Schema) {
+      for (const element of xmlport.Schema) {
+        if (element.SourceTable) {
+          this.addFieldReference({
+            sourceObjectId: objectId,
+            sourceObjectName: xmlport.Name,
+            sourceObjectType: 'XmlPort',
+            targetTableName: element.SourceTable,
+            targetFieldName: '*',
+            referenceType: 'table_usage',
+            context: {
+              elementName: element.Name,
+              propertyName: 'SourceTable',
+              expression: element.SourceTable
+            },
+            packageName: xmlport.PackageName
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Extract field references from table relations
+   */
+  private extractTableFieldReferences(table: ALTable, objectId: string): void {
+    if (!table.Fields) return;
+
+    for (const field of table.Fields) {
+      const tableRelation = this.getPropertyValue(field.Properties, 'TableRelation');
+      if (tableRelation && typeof tableRelation === 'string') {
+        // Parse table relation to extract referenced table and field
+        const parsed = this.parseTableRelation(tableRelation);
+        if (parsed) {
+          this.addFieldReference({
+            sourceObjectId: objectId,
+            sourceObjectName: table.Name,
+            sourceObjectType: 'Table',
+            targetTableName: parsed.tableName,
+            targetFieldName: parsed.fieldName || 'No.', // Default to primary key
+            referenceType: 'table_relation',
+            context: {
+              propertyName: 'TableRelation',
+              expression: tableRelation
+            },
+            packageName: table.PackageName
+          });
+        }
+      }
+    }
+  }
+
+  /**
+   * Add a field reference to the indices
+   */
+  private addFieldReference(reference: ALFieldReference): void {
+    this.allFieldReferences.push(reference);
+
+    // Index by target (table.field)
+    const targetKey = `${reference.targetTableName}.${reference.targetFieldName}`;
+    this.addToMapArray(this.fieldReferencesByTarget, targetKey, reference);
+
+    // Index by source object
+    this.addToMapArray(this.fieldReferencesBySource, reference.sourceObjectId, reference);
+  }
+
+  /**
+   * Get page source table from properties and resolve table ID to name
+   */
+  private getPageSourceTable(page: ALPage): string | undefined {
+    const sourceTableProp = this.getPropertyValue(page.Properties, 'SourceTable');
+    const sourceTableValue = sourceTableProp || page.SourceTable;
+
+    if (!sourceTableValue) return undefined;
+
+    // If it's a number (table ID), resolve to table name
+    if (typeof sourceTableValue === 'number' || /^\d+$/.test(sourceTableValue.toString())) {
+      const tableId = parseInt(sourceTableValue.toString());
+      const tableKey = `Table:${tableId}`;
+      const tableObj = this.objectsById.get(tableKey);
+      return tableObj ? tableObj.Name : undefined;
+    }
+
+    // If it's already a table name, return as-is
+    return sourceTableValue.toString();
+  }
+
+  /**
+   * Get property value by name
+   */
+  private getPropertyValue(properties: ALProperty[] | undefined, name: string): any {
+    if (!properties) return undefined;
+    const prop = properties.find(p => p.Name === name);
+    return prop ? prop.Value : undefined;
+  }
+
+  /**
+   * Parse field name from expression (e.g., "No." from "Rec.\"No.\"")
+   */
+  private parseFieldFromExpression(expression: string): string | undefined {
+    // Handle quoted field names: Rec."Field Name" or "Field Name"
+    const quotedMatch = expression.match(/"([^"]+)"/);
+    if (quotedMatch) {
+      return quotedMatch[1];
+    }
+
+    // Handle simple field names: Rec.FieldName or FieldName
+    const simpleMatch = expression.match(/(?:Rec\.)?([A-Za-z][A-Za-z0-9_]*)/);
+    if (simpleMatch) {
+      return simpleMatch[1];
+    }
+
+    return undefined;
+  }
+
+
+  /**
+   * Parse table relation string to extract table and field references
+   */
+  private parseTableRelation(tableRelation: string): { tableName: string; fieldName?: string } | undefined {
+    // Simple table reference: "Customer"
+    if (!tableRelation.includes('.')) {
+      return { tableName: tableRelation.replace(/"/g, '') };
+    }
+
+    // Table.Field reference: "Customer"."No."
+    const match = tableRelation.match(/"?([^".\.]+)"?\."?([^"]+)"?/);
+    if (match) {
+      return {
+        tableName: match[1],
+        fieldName: match[2]
+      };
+    }
+
+    return undefined;
   }
 
   /**
@@ -360,7 +861,7 @@ export class OptimizedSymbolDatabase implements ALSymbolDatabase {
    */
   buildOptimizedIndices(): void {
     const start = Date.now();
-    
+
     // Sort objects by name for faster binary search (future optimization)
     for (const [name, objects] of this.objectsByName) {
       objects.sort((a, b) => a.Name.localeCompare(b.Name));

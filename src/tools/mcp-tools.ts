@@ -1,12 +1,14 @@
-import { 
-  SearchObjectsArgs, 
-  GetObjectDefinitionArgs, 
+import {
+  SearchObjectsArgs,
+  GetObjectDefinitionArgs,
   FindReferencesArgs,
   LoadPackagesArgs,
   SearchProceduresArgs,
   SearchFieldsArgs,
   SearchControlsArgs,
   SearchDataItemsArgs,
+  FindFieldReferencesArgs,
+  FindFieldUsageArgs,
   SearchObjectsResult,
   GetObjectDefinitionResult,
   FindReferencesResult,
@@ -15,9 +17,11 @@ import {
   SearchProceduresResult,
   SearchFieldsResult,
   SearchControlsResult,
-  SearchDataItemsResult
+  SearchDataItemsResult,
+  FindFieldReferencesResult,
+  FindFieldUsageResult
 } from '../types/mcp-types';
-import { ALObjectDefinition } from '../types/al-types';
+import { ALObjectDefinition, ALFieldReference } from '../types/al-types';
 import { OptimizedSymbolDatabase } from '../core/symbol-database';
 import { ALPackageManager } from '../core/package-manager';
 
@@ -243,28 +247,93 @@ Once packages are loaded, you can search for AL objects like Customer table, Sal
   }
 
   /**
-   * Find references to a target object
+   * Find references to a target object or field
    */
-  async findReferences(args: FindReferencesArgs): Promise<FindReferencesResult> {
+  async findReferences(args: any): Promise<any> {
     const startTime = Date.now();
-    
+
     try {
-      const references = this.database.findReferences(
-        args.targetName,
-        args.referenceType,
-        args.sourceType
-      );
+      const checkResult = this.checkDatabaseLoaded();
+      if (checkResult.isEmpty) {
+        throw new Error(checkResult.message!);
+      }
 
-      const executionTime = Date.now() - startTime;
+      // Check if this is a field reference request
+      if (args.fieldName) {
+        // Field reference search
+        const fieldReferences = this.database.findFieldReferences(args.targetName, args.fieldName);
 
-      return {
-        references,
-        totalFound: references.length,
-        executionTimeMs: executionTime
-      };
+        // Apply filters if specified
+        let filteredRefs = fieldReferences;
+        if (args.referenceType) {
+          filteredRefs = filteredRefs.filter(ref => ref.referenceType === args.referenceType);
+        }
+        if (args.sourceType) {
+          filteredRefs = filteredRefs.filter(ref => ref.sourceObjectType === args.sourceType);
+        }
+
+        // Build summary statistics
+        const summary = this.buildFieldReferenceSummary(filteredRefs);
+
+        const executionTime = Date.now() - startTime;
+
+        return {
+          type: 'field_references',
+          tableName: args.targetName,
+          fieldName: args.fieldName,
+          references: filteredRefs,
+          totalFound: filteredRefs.length,
+          summary,
+          executionTimeMs: executionTime
+        };
+      } else {
+        // Object reference search (existing functionality)
+        const references = this.database.findReferences(
+          args.targetName,
+          args.referenceType,
+          args.sourceType
+        );
+
+        const executionTime = Date.now() - startTime;
+
+        return {
+          type: 'object_references',
+          targetName: args.targetName,
+          references,
+          totalFound: references.length,
+          executionTimeMs: executionTime
+        };
+      }
     } catch (error) {
       throw new Error(`Find references failed: ${error}`);
     }
+  }
+
+  /**
+   * Build summary statistics for field references
+   */
+  private buildFieldReferenceSummary(references: ALFieldReference[]) {
+    const byReferenceType: Record<string, number> = {};
+    const bySourceType: Record<string, number> = {};
+    const byPackage: Record<string, number> = {};
+
+    for (const ref of references) {
+      // Count by reference type
+      byReferenceType[ref.referenceType] = (byReferenceType[ref.referenceType] || 0) + 1;
+
+      // Count by source object type
+      bySourceType[ref.sourceObjectType] = (bySourceType[ref.sourceObjectType] || 0) + 1;
+
+      // Count by package
+      const packageName = ref.packageName || 'Unknown';
+      byPackage[packageName] = (byPackage[packageName] || 0) + 1;
+    }
+
+    return {
+      byReferenceType,
+      bySourceType,
+      byPackage
+    };
   }
 
   /**

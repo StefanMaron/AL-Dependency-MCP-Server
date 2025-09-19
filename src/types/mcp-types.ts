@@ -1,6 +1,6 @@
 // MCP Tool definitions for AL server
 
-import { ALObject, ALObjectDefinition, ALReference, ALPackageInfo, ALPackageLoadResult } from './al-types';
+import { ALObject, ALObjectDefinition, ALReference, ALFieldReference, ALPackageInfo, ALPackageLoadResult } from './al-types';
 
 export interface MCPToolArgs {
   [key: string]: any;
@@ -82,6 +82,24 @@ export interface SearchDataItemsArgs extends MCPToolArgs {
   limit?: number;
   offset?: number;
   includeDetails?: boolean;
+}
+
+// Field reference tool arguments
+export interface FindFieldReferencesArgs extends MCPToolArgs {
+  tableName: string;
+  fieldName?: string;
+  referenceType?: 'field_usage' | 'field_access' | 'field_filter' | 'table_relation' | 'table_usage';
+  sourceType?: string;
+  includeContext?: boolean;
+}
+
+export interface FindFieldUsageArgs extends MCPToolArgs {
+  tableName: string;
+  fieldName: string;
+  includePages?: boolean;
+  includeReports?: boolean;
+  includeCode?: boolean;
+  summaryMode?: boolean;
 }
 
 // Tool result types
@@ -168,5 +186,32 @@ export interface SearchDataItemsResult {
   offset: number;
   limit: number;
   hasMore: boolean;
+  executionTimeMs: number;
+}
+
+// Field reference tool results
+export interface FindFieldReferencesResult {
+  tableName: string;
+  fieldName?: string;
+  references: ALFieldReference[];
+  totalFound: number;
+  summary: {
+    byReferenceType: Record<string, number>;
+    bySourceType: Record<string, number>;
+    byPackage: Record<string, number>;
+  };
+  executionTimeMs: number;
+}
+
+export interface FindFieldUsageResult {
+  tableName: string;
+  fieldName: string;
+  usage: {
+    pages: ALFieldReference[];
+    reports: ALFieldReference[];
+    codeunits: ALFieldReference[];
+    other: ALFieldReference[];
+  };
+  totalUsages: number;
   executionTimeMs: number;
 }

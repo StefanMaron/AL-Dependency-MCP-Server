@@ -82,6 +82,8 @@ export interface ALControl {
   Type: string;
   Properties: ALProperty[];
   Controls?: ALControl[]; // Nested controls
+  SourceExpr?: string;     // Field reference for control
+  SourceTable?: string;    // Table reference for control
 }
 
 export interface ALProcedure {
@@ -100,6 +102,14 @@ export interface ALParameter {
 export interface ALDataItem {
   Name: string;
   SourceTable?: string;
+  Properties?: ALProperty[];
+  Columns?: ALReportColumn[];
+  DataItems?: ALDataItem[]; // Nested data items
+}
+
+export interface ALReportColumn {
+  Name: string;
+  SourceExpr?: string;     // Field or expression reference
   Properties?: ALProperty[];
 }
 
@@ -172,7 +182,28 @@ export interface ALReference {
   sourceType: string;
   targetName: string;
   targetType: string;
-  referenceType: string; // 'extends', 'uses', 'calls', 'table_relation'
+  referenceType: string; // 'extends', 'uses', 'calls', 'table_relation', 'variable', 'parameter', 'return_type'
+  packageName?: string;
+  context?: string; // Additional context like field name, procedure name, control name
+  details?: string; // Detailed information about the reference
+}
+
+// Field-specific reference types
+export interface ALFieldReference {
+  sourceObjectId: string;
+  sourceObjectName: string;
+  sourceObjectType: string;
+  targetTableName: string;
+  targetFieldName: string;
+  referenceType: 'field_usage' | 'field_access' | 'field_filter' | 'table_relation' | 'table_usage';
+  context?: {
+    controlName?: string;     // For page controls
+    procedureName?: string;   // For code references
+    dataItemName?: string;    // For report data items
+    elementName?: string;     // For XMLPort schema elements
+    propertyName?: string;    // For property-based references
+    expression?: string;      // For calculated fields or expressions
+  };
   packageName?: string;
 }
 
@@ -184,6 +215,8 @@ export interface ALSymbolDatabase {
   getObjectsByType(type: string): ALObject[];
   addObject(object: ALObject, packageName: string): void;
   findReferences(targetName: string, referenceType?: string, sourceType?: string): ALReference[];
+  findFieldReferences(tableName: string, fieldName?: string): ALFieldReference[];
+  findFieldUsage(tableName: string, fieldName: string): ALFieldReference[];
 }
 
 export interface ALPackageLoadResult {

@@ -334,16 +334,41 @@ export class StreamingSymbolParser {
    */
   private parseReport(data: any, baseObject: ALObject): ALReport {
     const report = baseObject as ALReport;
-    
-    if (data.Dataset) {
-      report.Dataset = data.Dataset.map((dataItem: any) => ({
+
+    // Check for both Dataset (older format) and DataItems (newer format)
+    const dataItems = data.Dataset || data.DataItems;
+    if (dataItems) {
+      report.Dataset = dataItems.map((dataItem: any) => ({
         Name: dataItem.Name || '',
-        SourceTable: dataItem.SourceTable,
-        Properties: this.parseProperties(dataItem.Properties)
+        SourceTable: dataItem.SourceTable || dataItem.RelatedTable,
+        Properties: this.parseProperties(dataItem.Properties),
+        Columns: dataItem.Columns ? dataItem.Columns.map((column: any) => ({
+          Name: column.Name || '',
+          SourceExpr: column.SourceExpr || column.SourceExpression,
+          Properties: this.parseProperties(column.Properties)
+        })) : undefined,
+        DataItems: dataItem.DataItems ? this.parseDataItems(dataItem.DataItems) : undefined
       }));
     }
 
     return report;
+  }
+
+  /**
+   * Parse nested data items recursively
+   */
+  private parseDataItems(dataItems: any[]): any[] {
+    return dataItems.map((dataItem: any) => ({
+      Name: dataItem.Name || '',
+      SourceTable: dataItem.SourceTable || dataItem.RelatedTable,
+      Properties: this.parseProperties(dataItem.Properties),
+      Columns: dataItem.Columns ? dataItem.Columns.map((column: any) => ({
+        Name: column.Name || '',
+        SourceExpr: column.SourceExpr || column.SourceExpression,
+        Properties: this.parseProperties(column.Properties)
+      })) : undefined,
+      DataItems: dataItem.DataItems ? this.parseDataItems(dataItem.DataItems) : undefined
+    }));
   }
 
   /**
@@ -368,7 +393,36 @@ export class StreamingSymbolParser {
    */
   private parseQuery(data: any, baseObject: ALObject): ALObject {
     const query = baseObject;
-    
+
+    // Handle Elements structure (actual format in symbol files)
+    if (data.Elements) {
+      (query as any).DataItems = data.Elements.map((element: any) => ({
+        Name: element.Name || '',
+        DataItemTable: element.RelatedTable,
+        Properties: this.parseProperties(element.Properties),
+        DataItemLink: element.DataItemLink
+      }));
+
+      // Extract columns from elements
+      const allColumns: any[] = [];
+      data.Elements.forEach((element: any) => {
+        if (element.Columns) {
+          element.Columns.forEach((column: any) => {
+            allColumns.push({
+              Name: column.Name || '',
+              DataSource: `${element.Name}.${column.SourceColumn || column.Name}`,
+              Properties: this.parseProperties(column.Properties)
+            });
+          });
+        }
+      });
+
+      if (allColumns.length > 0) {
+        (query as any).Columns = allColumns;
+      }
+    }
+
+    // Legacy format (if it exists)
     if (data.DataItems) {
       (query as any).DataItems = data.DataItems.map((dataItem: any) => ({
         Name: dataItem.Name || '',
@@ -377,7 +431,7 @@ export class StreamingSymbolParser {
         DataItemLink: dataItem.DataItemLink
       }));
     }
-    
+
     if (data.Columns) {
       (query as any).Columns = data.Columns.map((column: any) => ({
         Name: column.Name || '',
@@ -394,7 +448,24 @@ export class StreamingSymbolParser {
    */
   private parseXmlPort(data: any, baseObject: ALObject): ALObject {
     const xmlPort = baseObject;
-    
+
+    // Handle actual XMLPort structure (Variables, Methods, etc.)
+    if (data.Variables) {
+      (xmlPort as any).Variables = data.Variables.map((variable: any) => ({
+        Name: variable.Name || '',
+        TypeDefinition: variable.TypeDefinition
+      }));
+    }
+
+    if (data.Methods) {
+      (xmlPort as any).Methods = data.Methods.map((method: any) => ({
+        Name: method.Name || '',
+        Parameters: method.Parameters,
+        Properties: this.parseProperties(method.Properties)
+      }));
+    }
+
+    // Legacy Schema format (if it exists)
     if (data.Schema) {
       (xmlPort as any).Schema = data.Schema.map((element: any) => ({
         Name: element.Name || '',

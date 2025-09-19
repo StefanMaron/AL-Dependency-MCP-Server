@@ -152,23 +152,32 @@ export class ALMCPServer {
           },
           {
             name: 'al_find_references',
-            description: 'Find objects that reference a target object',
+            description: 'Comprehensive reference tracking: Find all objects that reference a target object or field. Tracks object-level references (extensions, usage, variables) and field-level references across pages, tables, reports, queries, and XMLPorts.',
             inputSchema: {
               type: 'object',
               properties: {
                 targetName: {
                   type: 'string',
-                  description: 'Name of the target object to find references to',
+                  description: 'Name of the target object to find references to (e.g., "Customer", "Item") or table name for field references',
+                },
+                fieldName: {
+                  type: 'string',
+                  description: 'Name of the field to find references to (optional). When provided, searches for specific field usage (e.g., "Name", "No."). Use "*" to find all field access to a table.',
                 },
                 referenceType: {
                   type: 'string',
-                  description: 'Type of reference to find',
-                  enum: ['extends', 'uses', 'calls', 'table_relation', 'source_table'],
+                  description: 'Type of reference to find (optional - returns all types if not specified). Object refs: extends, variable, parameter, return_type. Field refs: field_usage, table_usage, table_relation',
+                  enum: ['extends', 'source_table', 'table_relation', 'field_usage', 'table_usage', 'variable', 'parameter', 'return_type'],
                 },
                 sourceType: {
                   type: 'string',
-                  description: 'Filter by source object type',
-                  enum: ['Table', 'Page', 'Codeunit', 'Report', 'Enum', 'Interface', 'Field'],
+                  description: 'Filter by source object type that contains the reference (optional - returns all types if not specified)',
+                  enum: ['Table', 'Page', 'Codeunit', 'Report', 'Query', 'XmlPort', 'Enum', 'Interface'],
+                },
+                includeContext: {
+                  type: 'boolean',
+                  description: 'Include rich context: procedure names, variable names, control names, DataItem names, expressions, and detailed reference information',
+                  default: false,
                 },
               },
               required: ['targetName'],
