@@ -39,16 +39,13 @@ export class ALMCPTools {
     if (stats.totalObjects === 0) {
       return {
         isEmpty: true,
-        message: `No AL packages are currently loaded. To analyze AL objects, first load packages from your project directory using:
+        message: `No AL packages loaded. Load packages using al_packages tool:
 
-1. **Auto-discover from project root**: Use 'al_auto_discover' tool with the ABSOLUTE path to your AL project directory (the folder containing .alpackages/ or app.json)
-2. **Load from specific directory**: Use 'al_load_packages' tool with the path to your .alpackages directory
+al_packages with action='load' and path='<absolute-path-to-al-project>'
 
-Example: If your AL project is in "/path/to/my-al-project", call al_auto_discover with rootPath="/path/to/my-al-project"
+Example: path="/path/to/my-al-project" (the folder containing .alpackages/ or app.json)
 
-IMPORTANT: rootPath must be an absolute path like "/path/to/project" or "C:\\path\\to\\project". Relative paths like "." or "./project" are not supported. This ensures VS Code settings with relative paths like "./.alpackages" work correctly.
-
-Once packages are loaded, you can search for AL objects like Customer table, Sales-Post codeunit, etc.`
+The tool auto-discovers .alpackages directories by default. Use absolute paths like "/path/to/project" or "C:\\path\\to\\project".`
       };
     }
     return { isEmpty: false };
@@ -515,6 +512,58 @@ Once packages are loaded, you can search for AL objects like Customer table, Sal
       };
     } catch (error) {
       throw new Error(`Get object extensions failed: ${error}`);
+    }
+  }
+
+  /**
+   * Unified search for object members (procedures, fields, controls, dataitems)
+   */
+  async searchObjectMembers(args: {
+    objectName: string;
+    objectType?: string;
+    memberType: 'procedures' | 'fields' | 'controls' | 'dataitems';
+    pattern?: string;
+    limit?: number;
+    offset?: number;
+    includeDetails?: boolean;
+  }): Promise<any> {
+    // Route to appropriate specialized method
+    switch (args.memberType) {
+      case 'procedures':
+        return this.searchProcedures({
+          objectName: args.objectName,
+          objectType: args.objectType,
+          procedurePattern: args.pattern,
+          limit: args.limit,
+          offset: args.offset,
+          includeDetails: args.includeDetails,
+        });
+      case 'fields':
+        return this.searchFields({
+          objectName: args.objectName,
+          fieldPattern: args.pattern,
+          limit: args.limit,
+          offset: args.offset,
+          includeDetails: args.includeDetails,
+        });
+      case 'controls':
+        return this.searchControls({
+          objectName: args.objectName,
+          controlPattern: args.pattern,
+          limit: args.limit,
+          offset: args.offset,
+          includeDetails: args.includeDetails,
+        });
+      case 'dataitems':
+        return this.searchDataItems({
+          objectName: args.objectName,
+          dataItemPattern: args.pattern,
+          limit: args.limit,
+          offset: args.offset,
+          includeDetails: args.includeDetails,
+        });
+      default:
+        throw new Error(`Unknown member type: ${args.memberType}`);
     }
   }
 

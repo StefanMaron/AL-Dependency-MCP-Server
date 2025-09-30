@@ -56,46 +56,51 @@ export class ALMCPServer {
         tools: [
           {
             name: 'al_search_objects',
-            description: 'Search AL objects across loaded packages. ⚠️ WARNING: Can generate large responses (10K+ tokens). Use summaryMode:true and limit parameters to avoid token limits. For complex objects with many procedures, consider using al_get_object_summary instead.',
+            description: 'Search AL objects. Use summaryMode:true & limit for token efficiency. For complex objects prefer al_get_object_summary. Supports domain filtering.',
             inputSchema: {
               type: 'object',
               properties: {
                 pattern: {
                   type: 'string',
-                  description: 'Search pattern (supports wildcards like "Customer*" or "*Ledger*")',
+                  description: 'Search pattern (wildcards supported)',
                 },
                 objectType: {
                   type: 'string',
-                  description: 'Filter by object type (Table, Page, Codeunit, Report, Enum, etc.)',
+                  description: 'Filter by type',
                   enum: ['Table', 'Page', 'Codeunit', 'Report', 'Enum', 'Interface', 'PermissionSet', 'XmlPort', 'Query'],
                 },
                 packageName: {
                   type: 'string',
-                  description: 'Filter by package name',
+                  description: 'Filter by package',
+                },
+                domain: {
+                  type: 'string',
+                  description: 'Business domain filter',
+                  enum: ['Sales', 'Purchasing', 'Finance', 'Inventory', 'Manufacturing', 'Service'],
                 },
                 includeFields: {
                   type: 'boolean',
-                  description: 'Include field definitions for tables. ⚠️ WARNING: Significantly increases token usage',
+                  description: 'Include table fields (increases tokens)',
                   default: false,
                 },
                 includeProcedures: {
                   type: 'boolean',
-                  description: 'Include procedure definitions. ⚠️ WARNING: Can cause very large responses (15K+ tokens)',
+                  description: 'Include procedures (increases tokens)',
                   default: false,
                 },
                 limit: {
                   type: 'number',
-                  description: 'Maximum number of objects to return (default: 20, max: 100)',
+                  description: 'Max results (default: 20)',
                   default: 20,
                 },
                 offset: {
                   type: 'number',
-                  description: 'Number of objects to skip for pagination (default: 0)',
+                  description: 'Pagination offset (default: 0)',
                   default: 0,
                 },
                 summaryMode: {
                   type: 'boolean',
-                  description: 'Return summary view with limited details (default: true)',
+                  description: 'Summary view (default: true)',
                   default: true,
                 },
               },
@@ -103,17 +108,17 @@ export class ALMCPServer {
           },
           {
             name: 'al_get_object_definition',
-            description: 'Get complete definition of a specific AL object. ⚠️ WARNING: Can be large for complex objects (3K+ tokens). Use summaryMode:true and procedureLimit for large codeunits. For function overviews, use al_get_object_summary instead.',
+            description: 'Get object definition by ID or name. Use summaryMode:true for token efficiency. Use limits for large objects.',
             inputSchema: {
               type: 'object',
               properties: {
                 objectId: {
                   type: 'number',
-                  description: 'Object ID (e.g., 18 for Customer table)',
+                  description: 'Object ID',
                 },
                 objectName: {
                   type: 'string',
-                  description: 'Object name (alternative to objectId)',
+                  description: 'Object name (alternative to ID)',
                 },
                 objectType: {
                   type: 'string',
@@ -122,61 +127,61 @@ export class ALMCPServer {
                 },
                 packageName: {
                   type: 'string',
-                  description: 'Package name to resolve conflicts',
+                  description: 'Package (for disambiguation)',
                 },
                 includeFields: {
                   type: 'boolean',
-                  description: 'Include field definitions for tables (default: true)',
+                  description: 'Include table fields',
                   default: true,
                 },
                 includeProcedures: {
                   type: 'boolean',
-                  description: 'Include procedure definitions for codeunits. ⚠️ WARNING: Can be very large for complex objects (default: true)',
+                  description: 'Include procedures',
                   default: true,
                 },
                 summaryMode: {
                   type: 'boolean',
-                  description: 'Return summary view with limited details. ✅ RECOMMENDED: true for token efficiency (default: true)',
+                  description: 'Summary view (recommended)',
                   default: true,
                 },
                 fieldLimit: {
                   type: 'number',
-                  description: 'Maximum number of fields to return (default: 10 summary, 100 full)',
+                  description: 'Max fields (10 summary/100 full)',
                 },
                 procedureLimit: {
                   type: 'number',
-                  description: 'Maximum number of procedures to return (default: 10 summary, 50 full)',
+                  description: 'Max procedures (10 summary/50 full)',
                 },
               },
             },
           },
           {
             name: 'al_find_references',
-            description: 'Comprehensive reference tracking: Find all objects that reference a target object or field. Tracks object-level references (extensions, usage, variables) and field-level references across pages, tables, reports, queries, and XMLPorts.',
+            description: 'Find object/field references. Tracks extensions, variables, parameters, field usage, and table relations across all object types.',
             inputSchema: {
               type: 'object',
               properties: {
                 targetName: {
                   type: 'string',
-                  description: 'Name of the target object to find references to (e.g., "Customer", "Item") or table name for field references',
+                  description: 'Target object or table name',
                 },
                 fieldName: {
                   type: 'string',
-                  description: 'Name of the field to find references to (optional). When provided, searches for specific field usage (e.g., "Name", "No."). Use "*" to find all field access to a table.',
+                  description: 'Field name (optional, use "*" for all fields)',
                 },
                 referenceType: {
                   type: 'string',
-                  description: 'Type of reference to find (optional - returns all types if not specified). Object refs: extends, variable, parameter, return_type. Field refs: field_usage, table_usage, table_relation',
+                  description: 'Reference type filter',
                   enum: ['extends', 'source_table', 'table_relation', 'field_usage', 'table_usage', 'variable', 'parameter', 'return_type'],
                 },
                 sourceType: {
                   type: 'string',
-                  description: 'Filter by source object type that contains the reference (optional - returns all types if not specified)',
+                  description: 'Source object type filter',
                   enum: ['Table', 'Page', 'Codeunit', 'Report', 'Query', 'XmlPort', 'Enum', 'Interface'],
                 },
                 includeContext: {
                   type: 'boolean',
-                  description: 'Include rich context: procedure names, variable names, control names, DataItem names, expressions, and detailed reference information',
+                  description: 'Include detailed context',
                   default: false,
                 },
               },
@@ -184,245 +189,94 @@ export class ALMCPServer {
             },
           },
           {
-            name: 'al_load_packages',
-            description: 'Load AL packages from a specified directory',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                packagesPath: {
-                  type: 'string',
-                  description: 'Path to directory containing .app files',
-                },
-                forceReload: {
-                  type: 'boolean',
-                  description: 'Force reload even if packages are already loaded',
-                  default: false,
-                },
-              },
-              required: ['packagesPath'],
-            },
-          },
-          {
-            name: 'al_list_packages',
-            description: 'List currently loaded packages',
-            inputSchema: {
-              type: 'object',
-              properties: {},
-            },
-          },
-          {
-            name: 'al_auto_discover',
-            description: 'Auto-discover and load AL packages from .alpackages directories. Requires absolute path to AL project directory.',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                rootPath: {
-                  type: 'string',
-                  description: 'Absolute path to your AL project directory (e.g., "/path/to/my-al-project" or "C:\\path\\to\\my-al-project"). This supports relative paths in VS Code settings like "./.alpackages".',
-                },
-              },
-              required: ['rootPath'],
-            },
-          },
-          {
-            name: 'al_get_stats',
-            description: 'Get database statistics and performance metrics',
-            inputSchema: {
-              type: 'object',
-              properties: {},
-            },
-          },
-          {
-            name: 'al_search_by_domain',
-            description: 'Search objects by business domain (Sales, Finance, Inventory, etc.)',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                domain: {
-                  type: 'string',
-                  description: 'Business domain to search',
-                  enum: ['Sales', 'Purchasing', 'Finance', 'Inventory', 'Manufacturing', 'Service'],
-                },
-                objectTypes: {
-                  type: 'array',
-                  items: {
-                    type: 'string',
-                    enum: ['Table', 'Page', 'Codeunit', 'Report', 'Enum'],
-                  },
-                  description: 'Filter by object types',
-                },
-              },
-              required: ['domain'],
-            },
-          },
-          {
-            name: 'al_get_extensions',
-            description: 'Get objects that extend a base object',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                baseObjectName: {
-                  type: 'string',
-                  description: 'Name of the base object to find extensions for',
-                },
-              },
-              required: ['baseObjectName'],
-            },
-          },
-          {
-            name: 'al_search_procedures',
-            description: 'Search procedures within a specific AL object (codeunit, table, page, etc.)',
+            name: 'al_search_object_members',
+            description: 'Search procedures, fields, controls, or dataitems within an object. Unified search for all object child elements.',
             inputSchema: {
               type: 'object',
               properties: {
                 objectName: {
                   type: 'string',
-                  description: 'Name of the object to search procedures in',
+                  description: 'Parent object name',
                 },
                 objectType: {
                   type: 'string',
-                  description: 'Type of object (optional for disambiguation)',
-                  enum: ['Table', 'Page', 'Codeunit', 'Report', 'Enum', 'Interface', 'PermissionSet', 'XmlPort', 'Query'],
+                  description: 'Object type (optional)',
+                  enum: ['Table', 'Page', 'Codeunit', 'Report', 'Query', 'XmlPort'],
                 },
-                procedurePattern: {
+                memberType: {
                   type: 'string',
-                  description: 'Pattern to filter procedures (supports wildcards like "*Code*")',
+                  description: 'Member type to search',
+                  enum: ['procedures', 'fields', 'controls', 'dataitems'],
+                },
+                pattern: {
+                  type: 'string',
+                  description: 'Filter pattern (wildcards supported)',
                 },
                 limit: {
                   type: 'number',
-                  description: 'Maximum number of procedures to return (default: 20)',
+                  description: 'Max results (default: 20)',
                   default: 20,
                 },
                 offset: {
                   type: 'number',
-                  description: 'Number of procedures to skip for pagination (default: 0)',
+                  description: 'Pagination offset (default: 0)',
                   default: 0,
                 },
                 includeDetails: {
                   type: 'boolean',
-                  description: 'Include full procedure details or just names (default: true)',
+                  description: 'Include full details',
                   default: true,
                 },
               },
-              required: ['objectName'],
-            },
-          },
-          {
-            name: 'al_search_fields',
-            description: 'Search fields within a specific table',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                objectName: {
-                  type: 'string',
-                  description: 'Name of the table to search fields in',
-                },
-                fieldPattern: {
-                  type: 'string',
-                  description: 'Pattern to filter fields (supports wildcards like "*Code*")',
-                },
-                limit: {
-                  type: 'number',
-                  description: 'Maximum number of fields to return (default: 20)',
-                  default: 20,
-                },
-                offset: {
-                  type: 'number',
-                  description: 'Number of fields to skip for pagination (default: 0)',
-                  default: 0,
-                },
-                includeDetails: {
-                  type: 'boolean',
-                  description: 'Include full field details or just basic info (default: true)',
-                  default: true,
-                },
-              },
-              required: ['objectName'],
-            },
-          },
-          {
-            name: 'al_search_controls',
-            description: 'Search controls within a specific page',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                objectName: {
-                  type: 'string',
-                  description: 'Name of the page to search controls in',
-                },
-                controlPattern: {
-                  type: 'string',
-                  description: 'Pattern to filter controls (supports wildcards like "*Button*")',
-                },
-                limit: {
-                  type: 'number',
-                  description: 'Maximum number of controls to return (default: 20)',
-                  default: 20,
-                },
-                offset: {
-                  type: 'number',
-                  description: 'Number of controls to skip for pagination (default: 0)',
-                  default: 0,
-                },
-                includeDetails: {
-                  type: 'boolean',
-                  description: 'Include full control details or just basic info (default: true)',
-                  default: true,
-                },
-              },
-              required: ['objectName'],
-            },
-          },
-          {
-            name: 'al_search_dataitems',
-            description: 'Search data items within reports, queries, or xmlports',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                objectName: {
-                  type: 'string',
-                  description: 'Name of the report/query/xmlport to search data items in',
-                },
-                dataItemPattern: {
-                  type: 'string',
-                  description: 'Pattern to filter data items (supports wildcards like "*Header*")',
-                },
-                limit: {
-                  type: 'number',
-                  description: 'Maximum number of data items to return (default: 20)',
-                  default: 20,
-                },
-                offset: {
-                  type: 'number',
-                  description: 'Number of data items to skip for pagination (default: 0)',
-                  default: 0,
-                },
-                includeDetails: {
-                  type: 'boolean',
-                  description: 'Include full data item details or just basic info (default: true)',
-                  default: true,
-                },
-              },
-              required: ['objectName'],
+              required: ['objectName', 'memberType'],
             },
           },
           {
             name: 'al_get_object_summary',
-            description: '✅ TOKEN EFFICIENT: Get intelligent summary of AL objects with categorized procedures/functions. Perfect for complex codeunits like Sales-Post (96% token reduction vs detailed view). Returns organized categories instead of overwhelming raw lists.',
+            description: '✅ TOKEN EFFICIENT: Get categorized overview of object with intelligent procedure grouping. 96% token reduction vs full definition.',
             inputSchema: {
               type: 'object',
               properties: {
                 objectName: {
                   type: 'string',
-                  description: 'Name of the object to summarize',
+                  description: 'Object name',
                 },
                 objectType: {
                   type: 'string',
-                  description: 'Type of object (optional for disambiguation)',
+                  description: 'Object type (optional)',
                   enum: ['Table', 'Page', 'Codeunit', 'Report', 'Enum', 'Interface', 'PermissionSet', 'XmlPort', 'Query'],
                 },
               },
               required: ['objectName'],
+            },
+          },
+          {
+            name: 'al_packages',
+            description: 'Package management: load, list, or get stats. Auto-discovers .alpackages if path provided.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                action: {
+                  type: 'string',
+                  description: 'Action to perform',
+                  enum: ['load', 'list', 'stats'],
+                },
+                path: {
+                  type: 'string',
+                  description: 'Path to packages directory or AL project root (for load action)',
+                },
+                autoDiscover: {
+                  type: 'boolean',
+                  description: 'Auto-discover .alpackages directories (default: true for load)',
+                  default: true,
+                },
+                forceReload: {
+                  type: 'boolean',
+                  description: 'Force reload packages',
+                  default: false,
+                },
+              },
+              required: ['action'],
             },
           },
         ],
@@ -439,6 +293,21 @@ export class ALMCPServer {
 
         switch (name) {
           case 'al_search_objects':
+            // Handle domain filtering within search
+            if (args && (args as any).domain) {
+              const domainResult = await this.tools.searchByDomain(
+                (args as any).domain,
+                (args as any).objectType ? [(args as any).objectType] : undefined
+              );
+              return {
+                content: [
+                  {
+                    type: 'text',
+                    text: JSON.stringify(domainResult, null, 2),
+                  },
+                ],
+              };
+            }
             return {
               content: [
                 {
@@ -468,117 +337,12 @@ export class ALMCPServer {
               ],
             };
 
-          case 'al_load_packages':
+          case 'al_search_object_members':
             return {
               content: [
                 {
                   type: 'text',
-                  text: JSON.stringify(await this.tools.loadPackages(args as any), null, 2),
-                },
-              ],
-            };
-
-          case 'al_list_packages':
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(await this.tools.listPackages(), null, 2),
-                },
-              ],
-            };
-
-          case 'al_auto_discover':
-            const rootPath = args && (args as any).rootPath;
-            if (!rootPath) {
-              return {
-                content: [
-                  {
-                    type: 'text',
-                    text: JSON.stringify({ 
-                      error: 'rootPath parameter is required',
-                      message: 'Please provide the absolute path to your AL project directory.',
-                      example: 'al_auto_discover with rootPath="/path/to/your/al-project"'
-                    }, null, 2),
-                  },
-                ],
-              };
-            }
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(await this.tools.autoDiscoverPackages(rootPath), null, 2),
-                },
-              ],
-            };
-
-          case 'al_get_stats':
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(await this.tools.getDatabaseStats(), null, 2),
-                },
-              ],
-            };
-
-          case 'al_search_by_domain':
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(await this.tools.searchByDomain((args && (args as any).domain) || '', (args && (args as any).objectTypes)), null, 2),
-                },
-              ],
-            };
-
-          case 'al_get_extensions':
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(await this.tools.getObjectExtensions((args && (args as any).baseObjectName) || ''), null, 2),
-                },
-              ],
-            };
-
-          case 'al_search_procedures':
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(await this.tools.searchProcedures(args as any), null, 2),
-                },
-              ],
-            };
-
-          case 'al_search_fields':
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(await this.tools.searchFields(args as any), null, 2),
-                },
-              ],
-            };
-
-          case 'al_search_controls':
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(await this.tools.searchControls(args as any), null, 2),
-                },
-              ],
-            };
-
-          case 'al_search_dataitems':
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(await this.tools.searchDataItems(args as any), null, 2),
+                  text: JSON.stringify(await this.tools.searchObjectMembers(args as any), null, 2),
                 },
               ],
             };
@@ -592,6 +356,72 @@ export class ALMCPServer {
                 },
               ],
             };
+
+          case 'al_packages':
+            const action = (args as any)?.action;
+            const path = (args as any)?.path;
+            const autoDiscover = (args as any)?.autoDiscover !== false;
+            const forceReload = (args as any)?.forceReload || false;
+
+            switch (action) {
+              case 'load':
+                if (!path) {
+                  return {
+                    content: [
+                      {
+                        type: 'text',
+                        text: JSON.stringify({
+                          error: 'path parameter required for load action',
+                          message: 'Provide path to .alpackages directory or AL project root'
+                        }, null, 2),
+                      },
+                    ],
+                  };
+                }
+
+                if (autoDiscover) {
+                  return {
+                    content: [
+                      {
+                        type: 'text',
+                        text: JSON.stringify(await this.tools.autoDiscoverPackages(path), null, 2),
+                      },
+                    ],
+                  };
+                } else {
+                  return {
+                    content: [
+                      {
+                        type: 'text',
+                        text: JSON.stringify(await this.tools.loadPackages({ packagesPath: path, forceReload }), null, 2),
+                      },
+                    ],
+                  };
+                }
+
+              case 'list':
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify(await this.tools.listPackages(), null, 2),
+                    },
+                  ],
+                };
+
+              case 'stats':
+                return {
+                  content: [
+                    {
+                      type: 'text',
+                      text: JSON.stringify(await this.tools.getDatabaseStats(), null, 2),
+                    },
+                  ],
+                };
+
+              default:
+                throw new Error(`Unknown action: ${action}. Use 'load', 'list', or 'stats'`);
+            }
 
           default:
             throw new Error(`Unknown tool: ${name}`);
@@ -665,88 +495,6 @@ export class ALMCPServer {
       this.isInitialized = true; // Prevent retry loops
     } finally {
       this.initializationPromise = null;
-    }
-  }
-
-  async handleToolCall(request: { name: string; arguments: any }): Promise<any> {
-    const { name, arguments: args } = request;
-
-    // Ensure AL packages are loaded before processing any tool call
-    await this.ensureInitialized();
-
-    switch (name) {
-      case 'al_search_objects':
-        return {
-          content: await this.tools.searchObjects(args as any)
-        };
-
-      case 'al_get_object_definition':
-        return {
-          content: await this.tools.getObjectDefinition(args as any)
-        };
-
-      case 'al_list_packages':
-        return {
-          content: await this.tools.listPackages()
-        };
-
-      case 'al_auto_discover':
-        return {
-          content: await this.tools.autoDiscoverPackages(args.rootPath || '.')
-        };
-
-      case 'al_get_stats':
-        return {
-          content: await this.tools.getDatabaseStats()
-        };
-
-      case 'al_search_by_domain':
-        return {
-          content: await this.tools.searchByDomain(args.domain, args.objectTypes)
-        };
-
-      case 'al_find_references':
-        return {
-          content: await this.tools.findReferences(args as any)
-        };
-
-      case 'al_load_packages':
-        return {
-          content: await this.tools.loadPackages(args as any)
-        };
-
-      case 'al_get_object_extensions':
-        return {
-          content: await this.tools.getObjectExtensions(args.baseObjectName)
-        };
-
-      case 'al_search_procedures':
-        return {
-          content: await this.tools.searchProcedures(args as any)
-        };
-
-      case 'al_search_fields':
-        return {
-          content: await this.tools.searchFields(args as any)
-        };
-
-      case 'al_search_controls':
-        return {
-          content: await this.tools.searchControls(args as any)
-        };
-
-      case 'al_search_dataitems':
-        return {
-          content: await this.tools.searchDataItems(args as any)
-        };
-
-      case 'al_get_object_summary':
-        return {
-          content: await this.tools.getObjectSummary(args.objectName, args.objectType)
-        };
-
-      default:
-        throw new Error(`Unknown tool: ${name}`);
     }
   }
 
