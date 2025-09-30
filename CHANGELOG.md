@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2025-09-30
+
+### Added
+- consolidate MCP tools for token efficiency
+
 ## [2.1.4] - 2025-09-19
 
 ### Added
