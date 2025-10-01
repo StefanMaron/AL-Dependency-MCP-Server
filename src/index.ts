@@ -56,7 +56,7 @@ export class ALMCPServer {
         tools: [
           {
             name: 'al_search_objects',
-            description: 'Search AL objects. Use summaryMode:true & limit for token efficiency. For complex objects prefer al_get_object_summary. Supports domain filtering.',
+            description: 'Search AL objects in YOUR WORKSPACE (.app packages). Analyzes compiled AL code structure. Use summaryMode:true & limit for token efficiency. For complex objects prefer al_get_object_summary. Supports domain filtering.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -108,7 +108,7 @@ export class ALMCPServer {
           },
           {
             name: 'al_get_object_definition',
-            description: 'Get object definition by ID or name. Use summaryMode:true for token efficiency. Use limits for large objects.',
+            description: 'Get AL object definition from YOUR WORKSPACE. Retrieves compiled code structure by ID or name. Use summaryMode:true for token efficiency. Use limits for large objects.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -157,7 +157,7 @@ export class ALMCPServer {
           },
           {
             name: 'al_find_references',
-            description: 'Find object/field references. Tracks extensions, variables, parameters, field usage, and table relations across all object types.',
+            description: 'Find object/field references in YOUR WORKSPACE. Tracks extensions, variables, parameters, field usage, and table relations across all object types.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -190,7 +190,7 @@ export class ALMCPServer {
           },
           {
             name: 'al_search_object_members',
-            description: 'Search procedures, fields, controls, or dataitems within an object. Unified search for all object child elements.',
+            description: 'Search procedures, fields, controls, or dataitems within an object in YOUR WORKSPACE. Unified search for all object child elements.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -233,7 +233,7 @@ export class ALMCPServer {
           },
           {
             name: 'al_get_object_summary',
-            description: '✅ TOKEN EFFICIENT: Get categorized overview of object with intelligent procedure grouping. 96% token reduction vs full definition.',
+            description: '✅ TOKEN EFFICIENT: Get categorized overview of AL object in YOUR WORKSPACE. Intelligent procedure grouping with 96% token reduction vs full definition.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -252,7 +252,7 @@ export class ALMCPServer {
           },
           {
             name: 'al_packages',
-            description: 'Package management: load, list, or get stats. Auto-discovers .alpackages if path provided.',
+            description: 'Package management: load compiled .app packages, list loaded packages, or get stats. Auto-discovers .alpackages if path provided.',
             inputSchema: {
               type: 'object',
               properties: {

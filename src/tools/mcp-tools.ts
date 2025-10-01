@@ -39,13 +39,15 @@ export class ALMCPTools {
     if (stats.totalObjects === 0) {
       return {
         isEmpty: true,
-        message: `No AL packages loaded. Load packages using al_packages tool:
+        message: `No AL packages loaded from YOUR WORKSPACE. This tool analyzes compiled AL code (.app files), NOT documentation.
 
-al_packages with action='load' and path='<absolute-path-to-al-project>'
+To load your workspace packages, use: al_packages with action='load' and path='<absolute-path-to-al-project>'
 
-Example: path="/path/to/my-al-project" (the folder containing .alpackages/ or app.json)
+Example: path="/path/to/my-al-project" (folder containing .alpackages/ or app.json)
 
-The tool auto-discovers .alpackages directories by default. Use absolute paths like "/path/to/project" or "C:\\path\\to\\project".`
+The tool auto-discovers .alpackages directories by default. Use absolute paths like "/path/to/project" or "C:\\path\\to\\project".
+
+NOTE: For documentation and code examples, use microsoft_docs_search or microsoft_code_sample_search instead.`
       };
     }
     return { isEmpty: false };
