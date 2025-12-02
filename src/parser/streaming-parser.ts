@@ -71,8 +71,11 @@ export class StreamingSymbolParser {
         try {
           this.reportProgress('parsing', 0, undefined, 'Parsing JSON');
 
+                    // Trim any null characters that might be at the end of the file (common in some unzipped files)
+                    const cleanJsonData = jsonData.replace(/\0+$/, '');
+                    const symbolReference = JSON.parse(cleanJsonData);
           // Parse the complete JSON
-          const symbolReference = JSON.parse(jsonData);
+        //  const symbolReference = JSON.parse(jsonData);
           
           this.reportProgress('processing', 0, undefined, 'Processing AL objects');
 
