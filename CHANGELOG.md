@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Parse and index procedures for Table objects (#11)
+- Strip trailing null characters from JSON to fix AppSource package parsing (#12)
 
 ## [2.2.1] - 2025-10-01
 
