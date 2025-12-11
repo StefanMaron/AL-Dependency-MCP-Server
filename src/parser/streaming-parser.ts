@@ -71,8 +71,11 @@ export class StreamingSymbolParser {
         try {
           this.reportProgress('parsing', 0, undefined, 'Parsing JSON');
 
+          // Strip trailing null characters that may exist in some AppSource packages
+          const cleanJsonData = jsonData.replace(/\0+$/g, '');
+
           // Parse the complete JSON
-          const symbolReference = JSON.parse(jsonData);
+          const symbolReference = JSON.parse(cleanJsonData);
           
           this.reportProgress('processing', 0, undefined, 'Processing AL objects');
 
