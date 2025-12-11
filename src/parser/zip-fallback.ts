@@ -4,6 +4,19 @@ import * as os from 'os';
 import { promises as fs } from 'fs';
 import { Readable } from 'stream';
 
+export interface ExtractedManifest {
+  id: string;
+  name: string;
+  publisher: string;
+  version: string;
+  dependencies?: {
+    id: string;
+    name: string;
+    publisher: string;
+    version: string;
+  }[];
+}
+
 /**
  * Cross-platform ZIP extractor for AL symbol packages
  * Uses PowerShell Expand-Archive on Windows, unzip on Unix systems
@@ -71,6 +84,100 @@ export class ZipFallbackExtractor {
       }
       throw error;
     }
+  }
+
+  /**
+   * Extract manifest information from AL package (.app file)
+   * Parses NavxManifest.xml from the ZIP archive
+   */
+  async extractManifest(alPackagePath: string): Promise<ExtractedManifest> {
+    const tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'al-manifest-'));
+
+    try {
+      // Strip the AL header to create a valid ZIP
+      const strippedZipPath = await this.stripALPackageHeader(alPackagePath, tempDir);
+
+      // Extract the ZIP contents
+      await this.runUnzip(strippedZipPath, tempDir);
+
+      // Read NavxManifest.xml
+      const manifestPath = path.join(tempDir, 'NavxManifest.xml');
+      const manifestContent = await fs.readFile(manifestPath, 'utf8');
+
+      // Parse the XML manifest
+      return this.parseNavxManifest(manifestContent);
+    } finally {
+      // Clean up temp directory
+      try {
+        await fs.rm(tempDir, { recursive: true, force: true });
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+  }
+
+  /**
+   * Parse NavxManifest.xml content to extract package info
+   */
+  private parseNavxManifest(xmlContent: string): ExtractedManifest {
+    // Simple XML parsing without external dependencies
+    const getTagValue = (tag: string): string => {
+      const regex = new RegExp(`<${tag}>([^<]*)</${tag}>`, 'i');
+      const match = xmlContent.match(regex);
+      return match ? match[1].trim() : '';
+    };
+
+    const getAttrValue = (tag: string, attr: string): string => {
+      const regex = new RegExp(`<${tag}[^>]*\\s${attr}="([^"]*)"`, 'i');
+      const match = xmlContent.match(regex);
+      return match ? match[1].trim() : '';
+    };
+
+    // Extract App element attributes
+    const id = getAttrValue('App', 'Id') || getTagValue('Id');
+    const name = getAttrValue('App', 'Name') || getTagValue('Name');
+    const publisher = getAttrValue('App', 'Publisher') || getTagValue('Publisher');
+    const version = getAttrValue('App', 'Version') || getTagValue('Version');
+
+    // Extract dependencies
+    const dependencies: ExtractedManifest['dependencies'] = [];
+    const depRegex = /<Dependency[^>]*Id="([^"]*)"[^>]*Name="([^"]*)"[^>]*Publisher="([^"]*)"[^>]*(?:MinVersion|Version)="([^"]*)"/gi;
+    let depMatch;
+    while ((depMatch = depRegex.exec(xmlContent)) !== null) {
+      dependencies.push({
+        id: depMatch[1],
+        name: depMatch[2],
+        publisher: depMatch[3],
+        version: depMatch[4]
+      });
+    }
+
+    // Also try alternative dependency format
+    const depRegex2 = /<Dependency[^>]*>/gi;
+    const depMatches = xmlContent.match(depRegex2) || [];
+    for (const depTag of depMatches) {
+      const depId = depTag.match(/Id="([^"]*)"/)?.[1];
+      const depName = depTag.match(/Name="([^"]*)"/)?.[1];
+      const depPublisher = depTag.match(/Publisher="([^"]*)"/)?.[1];
+      const depVersion = depTag.match(/(?:MinVersion|Version)="([^"]*)"/)?.[1];
+
+      if (depId && !dependencies.some(d => d.id === depId)) {
+        dependencies.push({
+          id: depId,
+          name: depName || '',
+          publisher: depPublisher || '',
+          version: depVersion || ''
+        });
+      }
+    }
+
+    return {
+      id,
+      name,
+      publisher,
+      version,
+      dependencies: dependencies.length > 0 ? dependencies : undefined
+    };
   }
 
   /**

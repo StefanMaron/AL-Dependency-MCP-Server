@@ -3,6 +3,7 @@ import * as fs from 'fs/promises';
 import * as glob from 'fast-glob';
 import { ALCliWrapper, ALAppManifest } from '../cli/al-cli';
 import { StreamingSymbolParser, ParseProgress } from '../parser/streaming-parser';
+import { ZipFallbackExtractor } from '../parser/zip-fallback';
 import { OptimizedSymbolDatabase } from './symbol-database';
 import { ALPackageInfo, ALPackageLoadResult } from '../types/al-types';
 
@@ -16,6 +17,7 @@ export interface PackageDiscoveryOptions {
 export class ALPackageManager {
   private alCli: ALCliWrapper;
   private parser: StreamingSymbolParser;
+  private zipExtractor: ZipFallbackExtractor;
   private database: OptimizedSymbolDatabase;
   private progressCallback?: (progress: ParseProgress) => void;
 
@@ -27,6 +29,7 @@ export class ALPackageManager {
     this.alCli = alCli || new ALCliWrapper();
     this.progressCallback = progressCallback;
     this.parser = new StreamingSymbolParser(progressCallback);
+    this.zipExtractor = new ZipFallbackExtractor();
     this.database = database || new OptimizedSymbolDatabase();
   }
 
@@ -124,51 +127,107 @@ export class ALPackageManager {
 
   /**
    * Load a single AL package
+   * Tries ZIP extraction first, falls back to AL CLI if needed
    */
   private async loadSinglePackage(packagePath: string): Promise<{
     packageInfo: ALPackageInfo;
     objectCount: number;
   }> {
+    // Try ZIP extraction first (works without AL CLI)
     try {
-      // Get package manifest
-      const manifest = await this.alCli.getPackageManifest(packagePath);
-      
-      // Extract symbols
-      const symbolPath = await this.alCli.extractSymbols(packagePath);
-      
+      return await this.loadPackageViaZip(packagePath);
+    } catch (zipError) {
+      // Fall back to AL CLI for packages that need conversion
       try {
-        // Parse symbols
-        const objects = await this.parser.parseSymbolPackage(symbolPath, manifest.name);
-        
-        // Add objects to database
-        for (const obj of objects) {
-          this.database.addObject(obj, manifest.name);
-        }
-
-        // Create package info
-        const packageInfo: ALPackageInfo = {
-          name: manifest.name,
-          id: manifest.id,
-          version: manifest.version,
-          publisher: manifest.publisher,
-          dependencies: (manifest.dependencies || []).map(dep => ({
-            name: dep.name,
-            id: dep.id,
-            version: dep.version
-          })),
-          filePath: packagePath
-        };
-
-        return {
-          packageInfo,
-          objectCount: objects.length
-        };
-      } finally {
-        // Clean up temporary symbol file
-        await this.alCli.cleanupSymbolFile(symbolPath);
+        return await this.loadPackageViaAlCli(packagePath);
+      } catch (cliError) {
+        // Both methods failed - report the ZIP error as primary
+        throw new Error(`Failed to load package ${packagePath}: ${zipError}`);
       }
-    } catch (error) {
-      throw new Error(`Failed to load package ${packagePath}: ${error}`);
+    }
+  }
+
+  /**
+   * Load package using direct ZIP extraction (no AL CLI required)
+   */
+  private async loadPackageViaZip(packagePath: string): Promise<{
+    packageInfo: ALPackageInfo;
+    objectCount: number;
+  }> {
+    // Extract manifest directly from .app file via ZIP extraction
+    const manifest = await this.zipExtractor.extractManifest(packagePath);
+
+    // Parse symbols directly from .app file
+    const objects = await this.parser.parseSymbolPackage(packagePath, manifest.name);
+
+    // Add objects to database
+    for (const obj of objects) {
+      this.database.addObject(obj, manifest.name);
+    }
+
+    // Create package info
+    const packageInfo: ALPackageInfo = {
+      name: manifest.name,
+      id: manifest.id,
+      version: manifest.version,
+      publisher: manifest.publisher,
+      dependencies: (manifest.dependencies || []).map(dep => ({
+        name: dep.name,
+        id: dep.id,
+        version: dep.version
+      })),
+      filePath: packagePath
+    };
+
+    return {
+      packageInfo,
+      objectCount: objects.length
+    };
+  }
+
+  /**
+   * Load package using AL CLI tools (fallback for packages needing conversion)
+   */
+  private async loadPackageViaAlCli(packagePath: string): Promise<{
+    packageInfo: ALPackageInfo;
+    objectCount: number;
+  }> {
+    // Get package manifest via AL CLI
+    const manifest = await this.alCli.getPackageManifest(packagePath);
+
+    // Extract symbols via AL CLI
+    const symbolPath = await this.alCli.extractSymbols(packagePath);
+
+    try {
+      // Parse symbols
+      const objects = await this.parser.parseSymbolPackage(symbolPath, manifest.name);
+
+      // Add objects to database
+      for (const obj of objects) {
+        this.database.addObject(obj, manifest.name);
+      }
+
+      // Create package info
+      const packageInfo: ALPackageInfo = {
+        name: manifest.name,
+        id: manifest.id,
+        version: manifest.version,
+        publisher: manifest.publisher,
+        dependencies: (manifest.dependencies || []).map(dep => ({
+          name: dep.name,
+          id: dep.id,
+          version: dep.version
+        })),
+        filePath: packagePath
+      };
+
+      return {
+        packageInfo,
+        objectCount: objects.length
+      };
+    } finally {
+      // Clean up temporary symbol file
+      await this.alCli.cleanupSymbolFile(symbolPath);
     }
   }
 
@@ -407,11 +466,30 @@ export class ALPackageManager {
    */
   async resolveDependencyOrder(packagePaths: string[]): Promise<string[]> {
     const packageManifests = new Map<string, { manifest: ALAppManifest; path: string }>();
-    
-    // Load all manifests
+
+    // Load all manifests - try ZIP extraction first, fall back to AL CLI
     for (const packagePath of packagePaths) {
       try {
-        const manifest = await this.alCli.getPackageManifest(packagePath);
+        let manifest: ALAppManifest;
+        try {
+          const extracted = await this.zipExtractor.extractManifest(packagePath);
+          // Convert to ALAppManifest format
+          manifest = {
+            id: extracted.id,
+            name: extracted.name,
+            publisher: extracted.publisher,
+            version: extracted.version,
+            dependencies: extracted.dependencies?.map(dep => ({
+              id: dep.id,
+              name: dep.name,
+              publisher: dep.publisher,
+              version: dep.version
+            }))
+          };
+        } catch {
+          // Fall back to AL CLI
+          manifest = await this.alCli.getPackageManifest(packagePath);
+        }
         packageManifests.set(manifest.id, { manifest, path: packagePath });
       } catch (error) {
         console.warn(`Failed to load manifest for ${packagePath}: ${error}`);
@@ -459,20 +537,26 @@ export class ALPackageManager {
    */
   async filterToLatestVersions(packagePaths: string[]): Promise<string[]> {
     const packagesByName = new Map<string, { path: string; version: string; timestamp: number }[]>();
-    
+
     // Group packages by name
     for (const packagePath of packagePaths) {
       try {
-        const manifest = await this.alCli.getPackageManifest(packagePath);
+        // Try ZIP extraction first, fall back to AL CLI
+        let manifest;
+        try {
+          manifest = await this.zipExtractor.extractManifest(packagePath);
+        } catch {
+          manifest = await this.alCli.getPackageManifest(packagePath);
+        }
         const packageKey = `${manifest.publisher}_${manifest.name}`;
-        
+
         if (!packagesByName.has(packageKey)) {
           packagesByName.set(packageKey, []);
         }
-        
+
         // Get file timestamp for secondary sorting
         const stats = await fs.stat(packagePath);
-        
+
         packagesByName.get(packageKey)!.push({
           path: packagePath,
           version: manifest.version,
