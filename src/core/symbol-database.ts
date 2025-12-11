@@ -326,8 +326,12 @@ export class OptimizedSymbolDatabase implements ALSymbolDatabase {
         if (table.Fields) {
           this.fieldsByTable.set(object.Name, table.Fields);
         }
+        // Tables can also have procedures (triggers like OnInsert, OnModify, etc.)
+        if ('Procedures' in object && (object as any).Procedures) {
+          this.proceduresByObject.set(object.Name, (object as any).Procedures);
+        }
         break;
-        
+
       case 'Page':
       case 'Codeunit':
       case 'Report':

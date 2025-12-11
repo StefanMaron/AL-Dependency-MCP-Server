@@ -30,6 +30,7 @@ export interface ALTable extends ALObject {
   Type: 'Table';
   Fields?: ALField[];
   Keys?: ALKey[];
+  Procedures?: ALProcedure[];
 }
 
 export interface ALPage extends ALObject {

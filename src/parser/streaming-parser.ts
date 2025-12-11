@@ -277,7 +277,7 @@ export class StreamingSymbolParser {
    */
   private parseTable(data: any, baseObject: ALObject): ALTable {
     const table = baseObject as ALTable;
-    
+
     if (data.Fields) {
       table.Fields = data.Fields.map((fieldData: any) => this.parseField(fieldData));
     }
@@ -288,6 +288,13 @@ export class StreamingSymbolParser {
         Properties: this.parseProperties(keyData.Properties),
         Name: keyData.Name
       }));
+    }
+
+    // AL symbol files use "Methods" for table triggers and procedures
+    if (data.Methods) {
+      table.Procedures = data.Methods.map((methodData: any) => this.parseProcedure(methodData));
+    } else if (data.Procedures) {
+      table.Procedures = data.Procedures.map((procData: any) => this.parseProcedure(procData));
     }
 
     return table;
