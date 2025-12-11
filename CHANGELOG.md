@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Strip trailing null characters from JSON to fix AppSource package parsing (#12)
 - Extract manifest and symbols directly from .app files via ZIP, with AL CLI fallback for packages requiring conversion (#13)
 
+## [2.3.0] - 2025-12-11
+
+### Fixed
+- update changelog for issue #13 fix
+- use ZIP extraction for packages with AL CLI fallback
+- update changelog for issue #12 fix
+- strip trailing null characters from JSON before parsing
+- update changelog for issue #11 fix
+- parse and index procedures for Table objects
+
 ## [2.2.1] - 2025-10-01
 
 ### Changed
