@@ -12,6 +12,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Strip trailing null characters from JSON to fix AppSource package parsing (#12)
 - Extract manifest and symbols directly from .app files via ZIP, with AL CLI fallback for packages requiring conversion (#13)
 
+## [2.3.1] - 2026-02-09
+
+### Fixed
+- upgrade npm to latest version for trusted publishing
+- update npm publish command to include provenance flag
+- update Node.js setup to remove registry-url for trusted publishing
+- update Node.js version to 22 and remove npm upgrade step from publish workflow
+- upgrade npm for trusted publishing and remove provenance flag from publish command
+- update npm publish command to include provenance
+- Merge pull request #16 from Piotr-Grzybowski/feature/Fix-slow-loading-symbols-on-Windows
+
+### Changed
+- #1111 - Changed loading symbols for Windows
+
 ## [2.3.0] - 2025-12-11
 
 ### Fixed
