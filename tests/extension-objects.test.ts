@@ -111,11 +111,6 @@ describeOrSkip('StreamingSymbolParser - Extension Objects', () => {
     it('should parse the extension app and find extension objects', async () => {
       const objects = await parser.parseSymbolPackage(EXT_APP_PATH, 'Extension Test App');
 
-      // BUG: Extension objects not parsed - the parser currently only handles
-      // regular object arrays (Tables, Pages, Codeunits, etc.) but does NOT
-      // handle extension arrays (TableExtensions, PageExtensions,
-      // EnumExtensionTypes, ReportExtensions). This test expects 4 extension
-      // objects once the parser is fixed.
       expect(objects.length).toBe(4);
     });
 
@@ -125,7 +120,6 @@ describeOrSkip('StreamingSymbolParser - Extension Objects', () => {
         o => o.Type === 'TableExtension' && o.Name === 'Test Item Ext'
       );
 
-      // BUG: Extension objects not parsed - should find TableExtension once fixed
       expect(tableExt).toBeDefined();
       expect(tableExt!.Id).toBe(70000);
       expect(tableExt!.Type).toBe('TableExtension');
@@ -137,7 +131,6 @@ describeOrSkip('StreamingSymbolParser - Extension Objects', () => {
         o => o.Type === 'TableExtension' && o.Name === 'Test Item Ext'
       ) as (ALObject & { Fields?: any[] }) | undefined;
 
-      // BUG: Extension objects not parsed
       expect(tableExt).toBeDefined();
 
       // After parsing, the table extension should have 3 fields
@@ -154,7 +147,6 @@ describeOrSkip('StreamingSymbolParser - Extension Objects', () => {
         o => o.Type === 'PageExtension' && o.Name === 'Test Item Card Ext'
       );
 
-      // BUG: Extension objects not parsed
       expect(pageExt).toBeDefined();
       expect(pageExt!.Id).toBe(70000);
       expect(pageExt!.Type).toBe('PageExtension');
@@ -166,8 +158,6 @@ describeOrSkip('StreamingSymbolParser - Extension Objects', () => {
         o => o.Type === 'EnumExtensionType' && o.Name === 'Test Status Ext'
       );
 
-      // BUG: Extension objects not parsed - note the type is EnumExtensionType
-      // (matching the SymbolReference.json key "EnumExtensionTypes")
       expect(enumExt).toBeDefined();
       expect(enumExt!.Id).toBe(70000);
       expect(enumExt!.Type).toBe('EnumExtensionType');
@@ -179,7 +169,6 @@ describeOrSkip('StreamingSymbolParser - Extension Objects', () => {
         o => o.Type === 'EnumExtensionType' && o.Name === 'Test Status Ext'
       ) as (ALObject & { Values?: any[] }) | undefined;
 
-      // BUG: Extension objects not parsed
       expect(enumExt).toBeDefined();
       expect(enumExt!.Values).toBeDefined();
       expect(enumExt!.Values!.length).toBe(2);
@@ -194,7 +183,6 @@ describeOrSkip('StreamingSymbolParser - Extension Objects', () => {
         o => o.Type === 'ReportExtension' && o.Name === 'Test Item List Ext'
       );
 
-      // BUG: Extension objects not parsed
       expect(reportExt).toBeDefined();
       expect(reportExt!.Id).toBe(70000);
       expect(reportExt!.Type).toBe('ReportExtension');
@@ -239,8 +227,6 @@ describeOrSkip('StreamingSymbolParser - Extension Objects', () => {
     it('should assign PackageName to all parsed extension objects', async () => {
       const objects = await parser.parseSymbolPackage(EXT_APP_PATH, 'Extension Test App');
 
-      // BUG: Extension objects not parsed - when fixed, every object should
-      // carry the package name
       expect(objects.length).toBeGreaterThan(0);
       for (const obj of objects) {
         expect(obj.PackageName).toBe('Extension Test App');
@@ -385,9 +371,6 @@ describe('OptimizedSymbolDatabase - Extension Object Indexing', () => {
 
       database.addObject(tableExt as ALObject, 'Extension Test App');
 
-      // BUG: indexTypeSpecificData only indexes fields for Type === 'Table',
-      // not 'TableExtension'. After the fix, extension fields should be
-      // accessible via getTableFields using the extension object's name.
       const fields = database.getTableFields('Test Item Ext');
       expect(fields).toHaveLength(3);
       expect(fields.map(f => f.Name).sort()).toEqual([
@@ -467,7 +450,6 @@ describeOrSkip('Integration - Extension Objects End-to-End', () => {
       // Base app: 5 objects (Table, Page, Codeunit, Enum, Report)
       // Extension app: 4 extensions (TableExtension, PageExtension,
       //   EnumExtensionType, ReportExtension)
-      // BUG: If extensions are not parsed, total will be only 5
       expect(stats.totalObjects).toBe(9);
     });
   });
@@ -476,7 +458,6 @@ describeOrSkip('Integration - Extension Objects End-to-End', () => {
     it('should find TableExtension via getExtensions("Test Item")', () => {
       const extensions = database.getExtensions('Test Item');
 
-      // BUG: If extensions are not parsed, this will be empty
       expect(extensions.length).toBeGreaterThanOrEqual(1);
 
       const tableExt = extensions.find(e => e.Type === 'TableExtension');
@@ -545,7 +526,6 @@ describeOrSkip('Integration - Extension Objects End-to-End', () => {
     it('should report extension type counts in objectsByType', () => {
       const stats = database.getStatistics();
 
-      // BUG: If extensions not parsed, these will be undefined
       expect(stats.objectsByType.get('TableExtension')).toBe(1);
       expect(stats.objectsByType.get('PageExtension')).toBe(1);
       expect(stats.objectsByType.get('EnumExtensionType')).toBe(1);
@@ -570,7 +550,6 @@ describeOrSkip('Integration - Extension Objects End-to-End', () => {
       const summary = database.getPackageSummary();
 
       expect(summary.get('Base Test App')).toBe(5);
-      // BUG: If extensions not parsed, Extension Test App will have 0 objects
       expect(summary.get('Extension Test App')).toBe(4);
     });
   });
@@ -592,7 +571,6 @@ describeOrSkip('Integration - Extension Objects End-to-End', () => {
     it('should filter extension objects by package name', () => {
       const extOnly = database.searchObjects('*', undefined, 'Extension Test App');
 
-      // BUG: If extensions not parsed, this will be empty
       expect(extOnly.length).toBe(4);
       for (const obj of extOnly) {
         expect(obj.PackageName).toBe('Extension Test App');

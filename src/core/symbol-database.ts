@@ -181,8 +181,8 @@ export class OptimizedSymbolDatabase implements ALSymbolDatabase {
     
     for (const obj of this.allObjects) {
       if (obj.Name === objectName) {
-        if (obj.Type === 'Report' && (obj as any).DataItems) {
-          results.push(...((obj as any).DataItems));
+        if (obj.Type === 'Report' && (obj as any).Dataset) {
+          results.push(...((obj as any).Dataset));
         } else if (obj.Type === 'Query' && (obj as any).DataItems) {
           results.push(...((obj as any).DataItems));
         } else if (obj.Type === 'XmlPort' && (obj as any).Schema) {
