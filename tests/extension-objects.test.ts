@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as fs from 'fs';
 import { StreamingSymbolParser } from '../src/parser/streaming-parser';
 import { OptimizedSymbolDatabase } from '../src/core/symbol-database';
 import { ALObject, ALTable, ALEnum, ALReport } from '../src/types/al-types';
@@ -9,6 +10,10 @@ import { ALObject, ALTable, ALEnum, ALReport } from '../src/types/al-types';
  * Tests that the AL MCP Server correctly parses and indexes extension objects
  * (TableExtension, PageExtension, EnumExtensionType, ReportExtension) from
  * compiled .app fixture files.
+ *
+ * Fixture apps are compiled on demand by the Jest globalSetup script
+ * (tests/fixtures/compile-fixtures.ts). If the AL CLI is not available,
+ * these tests are skipped gracefully.
  *
  * Fixture apps:
  *   - Base app: TestPublisher_Base Test App_1.0.0.0.app
@@ -37,10 +42,14 @@ const FIXTURES_DIR = path.resolve(__dirname, 'fixtures', 'compiled');
 const BASE_APP_PATH = path.join(FIXTURES_DIR, 'TestPublisher_Base Test App_1.0.0.0.app');
 const EXT_APP_PATH = path.join(FIXTURES_DIR, 'TestPublisher_Extension Test App_1.0.0.0.app');
 
+// Skip entire file if compiled fixtures are not available (AL CLI missing)
+const fixturesAvailable = fs.existsSync(BASE_APP_PATH) && fs.existsSync(EXT_APP_PATH);
+const describeOrSkip = fixturesAvailable ? describe : describe.skip;
+
 // ---------------------------------------------------------------------------
 // 1. Parser Tests
 // ---------------------------------------------------------------------------
-describe('StreamingSymbolParser - Extension Objects', () => {
+describeOrSkip('StreamingSymbolParser - Extension Objects', () => {
   let parser: StreamingSymbolParser;
 
   beforeEach(() => {
@@ -433,7 +442,7 @@ describe('OptimizedSymbolDatabase - Extension Object Indexing', () => {
 // ---------------------------------------------------------------------------
 // 3. Integration Tests - Full Pipeline (Parser -> Database)
 // ---------------------------------------------------------------------------
-describe('Integration - Extension Objects End-to-End', () => {
+describeOrSkip('Integration - Extension Objects End-to-End', () => {
   let parser: StreamingSymbolParser;
   let database: OptimizedSymbolDatabase;
 
