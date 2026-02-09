@@ -40,6 +40,9 @@ jobs:
   publish:
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write  # Required for NPM provenance
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -173,9 +176,7 @@ jobs:
           echo "NEW_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
 
       - name: Publish to npm
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
 
       # Only create/push tag for manual workflow dispatch
       - name: Create and push tag (manual trigger)
