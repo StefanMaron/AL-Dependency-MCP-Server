@@ -165,6 +165,8 @@ export class OptimizedSymbolDatabase implements ALSymbolDatabase {
     for (const obj of this.allObjects) {
       if (obj.Name === objectName && obj.Type === 'Page' && (obj as any).Controls) {
         results.push(...((obj as any).Controls));
+      } else if (obj.Name === objectName && obj.Type === 'PageExtension' && (obj as any).ControlChanges) {
+        results.push(...((obj as any).ControlChanges));
       }
     }
     
@@ -185,6 +187,8 @@ export class OptimizedSymbolDatabase implements ALSymbolDatabase {
           results.push(...((obj as any).DataItems));
         } else if (obj.Type === 'XmlPort' && (obj as any).Schema) {
           results.push(...((obj as any).Schema));
+        } else if (obj.Type === 'ReportExtension' && (obj as any).Dataset) {
+          results.push(...((obj as any).Dataset));
         }
       }
     }
@@ -339,6 +343,23 @@ export class OptimizedSymbolDatabase implements ALSymbolDatabase {
           this.proceduresByObject.set(object.Name, (object as any).Procedures);
         }
         break;
+
+      case 'TableExtension':
+        // Index extension fields - same pattern as Table
+        if ((object as any).Fields) {
+          this.fieldsByTable.set(object.Name, (object as any).Fields);
+        }
+        if ('Procedures' in object && (object as any).Procedures) {
+          this.proceduresByObject.set(object.Name, (object as any).Procedures);
+        }
+        break;
+
+      case 'PageExtension':
+      case 'ReportExtension':
+        if ('Procedures' in object && (object as any).Procedures) {
+          this.proceduresByObject.set(object.Name, (object as any).Procedures);
+        }
+        break;
     }
 
     // Check for extension relationships
@@ -389,6 +410,28 @@ export class OptimizedSymbolDatabase implements ALSymbolDatabase {
       if (table.Fields) {
         for (const field of table.Fields) {
           const tableRelationProperty = field.Properties?.find(p => p.Name === 'TableRelation');
+          if (tableRelationProperty &&
+              typeof tableRelationProperty.Value === 'string' &&
+              tableRelationProperty.Value.includes(targetName)) {
+            references.push({
+              sourceName: `${sourceObject.Name}.${field.Name}`,
+              sourceType: 'Field',
+              targetName,
+              targetType: 'Table',
+              referenceType: 'table_relation',
+              packageName: sourceObject.PackageName
+            });
+          }
+        }
+      }
+    }
+
+    // Check table relations in table extension fields
+    if (sourceObject.Type === 'TableExtension') {
+      const tableExt = sourceObject as any;
+      if (tableExt.Fields) {
+        for (const field of tableExt.Fields) {
+          const tableRelationProperty = field.Properties?.find((p: any) => p.Name === 'TableRelation');
           if (tableRelationProperty &&
               typeof tableRelationProperty.Value === 'string' &&
               tableRelationProperty.Value.includes(targetName)) {
@@ -544,6 +587,9 @@ export class OptimizedSymbolDatabase implements ALSymbolDatabase {
         this.extractXmlPortFieldReferences(object as any, objectId);
         break;
       case 'Table':
+        this.extractTableFieldReferences(object as ALTable, objectId);
+        break;
+      case 'TableExtension':
         this.extractTableFieldReferences(object as ALTable, objectId);
         break;
       // Note: Codeunit field references would require parsing procedure bodies

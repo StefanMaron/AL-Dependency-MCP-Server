@@ -97,7 +97,7 @@ NOTE: For documentation and code examples, use microsoft_docs_search or microsof
           }
           
           // Summary mode: just counts for fields/procedures
-          if (args.includeFields && obj.Type === 'Table') {
+          if (args.includeFields && (obj.Type === 'Table' || obj.Type === 'TableExtension')) {
             const fields = this.database.getTableFields(obj.Name);
             (enriched as any).FieldCount = fields.length;
             (enriched as any).Fields = fields.slice(0, 3); // Show first 3 fields
@@ -112,7 +112,7 @@ NOTE: For documentation and code examples, use microsoft_docs_search or microsof
           }
         } else {
           // Full mode - include everything but still apply reasonable limits
-          if (args.includeFields && obj.Type === 'Table') {
+          if (args.includeFields && (obj.Type === 'Table' || obj.Type === 'TableExtension')) {
             const fields = this.database.getTableFields(obj.Name);
             (enriched as any).Fields = fields.slice(0, 50); // Max 50 fields
             if (fields.length > 50) {
@@ -200,7 +200,7 @@ NOTE: For documentation and code examples, use microsoft_docs_search or microsof
       };
 
       // Add fields for tables
-      if (object.Type === 'Table' && (args.includeFields !== false)) {
+      if ((object.Type === 'Table' || object.Type === 'TableExtension') && (args.includeFields !== false)) {
         const allFields = this.database.getTableFields(object.Name);
         definition.Fields = allFields.slice(0, fieldLimit);
         if (allFields.length > fieldLimit) {
@@ -220,7 +220,7 @@ NOTE: For documentation and code examples, use microsoft_docs_search or microsof
       }
 
       // Add keys for tables
-      if (object.Type === 'Table' && (object as any).Keys) {
+      if ((object.Type === 'Table' || object.Type === 'TableExtension') && (object as any).Keys) {
         definition.Keys = (object as any).Keys;
       }
 
@@ -659,11 +659,11 @@ NOTE: For documentation and code examples, use microsoft_docs_search or microsof
       const includeDetails = args.includeDetails !== false;
       
       // Find the table
-      const objects = this.database.searchObjects(args.objectName, 'Table');
-      const targetTable = objects.find(obj => obj.Name === args.objectName);
-      
+      const objects = this.database.searchObjects(args.objectName);
+      const targetTable = objects.find(obj => obj.Name === args.objectName && (obj.Type === 'Table' || obj.Type === 'TableExtension'));
+
       if (!targetTable) {
-        throw new Error(`Table not found: ${args.objectName}`);
+        throw new Error(`Table or TableExtension not found: ${args.objectName}`);
       }
 
       // Get all fields for the table
@@ -732,11 +732,11 @@ NOTE: For documentation and code examples, use microsoft_docs_search or microsof
       const includeDetails = args.includeDetails !== false;
       
       // Find the page
-      const objects = this.database.searchObjects(args.objectName, 'Page');
-      const targetPage = objects.find(obj => obj.Name === args.objectName);
-      
+      const objects = this.database.searchObjects(args.objectName);
+      const targetPage = objects.find(obj => obj.Name === args.objectName && (obj.Type === 'Page' || obj.Type === 'PageExtension'));
+
       if (!targetPage) {
-        throw new Error(`Page not found: ${args.objectName}`);
+        throw new Error(`Page or PageExtension not found: ${args.objectName}`);
       }
 
       // Get all controls for the page
@@ -806,13 +806,13 @@ NOTE: For documentation and code examples, use microsoft_docs_search or microsof
       
       // Find the object (Report, Query, or XmlPort)
       const objects = this.database.searchObjects(args.objectName);
-      const targetObject = objects.find(obj => 
-        obj.Name === args.objectName && 
-        ['Report', 'Query', 'XmlPort'].includes(obj.Type)
+      const targetObject = objects.find(obj =>
+        obj.Name === args.objectName &&
+        ['Report', 'ReportExtension', 'Query', 'XmlPort'].includes(obj.Type)
       );
-      
+
       if (!targetObject) {
-        throw new Error(`Report/Query/XmlPort not found: ${args.objectName}`);
+        throw new Error(`Report/ReportExtension/Query/XmlPort not found: ${args.objectName}`);
       }
 
       // Get all data items for the object

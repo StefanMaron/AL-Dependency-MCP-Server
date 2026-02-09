@@ -67,7 +67,7 @@ export class ALMCPServer {
                 objectType: {
                   type: 'string',
                   description: 'Filter by type',
-                  enum: ['Table', 'Page', 'Codeunit', 'Report', 'Enum', 'Interface', 'PermissionSet', 'XmlPort', 'Query'],
+                  enum: ['Table', 'TableExtension', 'Page', 'PageExtension', 'Codeunit', 'Report', 'ReportExtension', 'Enum', 'EnumExtensionType', 'Interface', 'PermissionSet', 'PermissionSetExtension', 'XmlPort', 'Query'],
                 },
                 packageName: {
                   type: 'string',
@@ -123,7 +123,7 @@ export class ALMCPServer {
                 objectType: {
                   type: 'string',
                   description: 'Object type',
-                  enum: ['Table', 'Page', 'Codeunit', 'Report', 'Enum', 'Interface', 'PermissionSet', 'XmlPort', 'Query'],
+                  enum: ['Table', 'TableExtension', 'Page', 'PageExtension', 'Codeunit', 'Report', 'ReportExtension', 'Enum', 'EnumExtensionType', 'Interface', 'PermissionSet', 'PermissionSetExtension', 'XmlPort', 'Query'],
                 },
                 packageName: {
                   type: 'string',
@@ -177,7 +177,7 @@ export class ALMCPServer {
                 sourceType: {
                   type: 'string',
                   description: 'Source object type filter',
-                  enum: ['Table', 'Page', 'Codeunit', 'Report', 'Query', 'XmlPort', 'Enum', 'Interface'],
+                  enum: ['Table', 'TableExtension', 'Page', 'PageExtension', 'Codeunit', 'Report', 'ReportExtension', 'Enum', 'EnumExtensionType', 'Interface', 'PermissionSet', 'PermissionSetExtension', 'XmlPort', 'Query'],
                 },
                 includeContext: {
                   type: 'boolean',
@@ -201,7 +201,7 @@ export class ALMCPServer {
                 objectType: {
                   type: 'string',
                   description: 'Object type (optional)',
-                  enum: ['Table', 'Page', 'Codeunit', 'Report', 'Query', 'XmlPort'],
+                  enum: ['Table', 'TableExtension', 'Page', 'PageExtension', 'Codeunit', 'Report', 'ReportExtension', 'Query', 'XmlPort'],
                 },
                 memberType: {
                   type: 'string',
@@ -244,7 +244,7 @@ export class ALMCPServer {
                 objectType: {
                   type: 'string',
                   description: 'Object type (optional)',
-                  enum: ['Table', 'Page', 'Codeunit', 'Report', 'Enum', 'Interface', 'PermissionSet', 'XmlPort', 'Query'],
+                  enum: ['Table', 'TableExtension', 'Page', 'PageExtension', 'Codeunit', 'Report', 'ReportExtension', 'Enum', 'EnumExtensionType', 'Interface', 'PermissionSet', 'PermissionSetExtension', 'XmlPort', 'Query'],
                 },
               },
               required: ['objectName'],
