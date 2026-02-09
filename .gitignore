@@ -48,3 +48,5 @@ logs/
 *.app
 rad.json
 !tests/fixtures/*.json
+tests/fixtures/compiled/
+tests/fixtures/*/rad.json

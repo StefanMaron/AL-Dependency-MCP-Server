@@ -121,7 +121,9 @@ export class StreamingSymbolParser {
 
     const objectTypes = [
       'Tables', 'Pages', 'Codeunits', 'Reports', 'Queries', 'XmlPorts',
-      'Enums', 'EnumTypes', 'Interfaces', 'PermissionSets', 'ControlAddIns'
+      'Enums', 'EnumTypes', 'Interfaces', 'PermissionSets', 'ControlAddIns',
+      'TableExtensions', 'PageExtensions', 'EnumExtensionTypes',
+      'ReportExtensions', 'PermissionSetExtensions'
     ];
     
     for (const objectType of objectTypes) {
@@ -137,6 +139,8 @@ export class StreamingSymbolParser {
           singularType = 'XmlPort';
         } else if (objectType === 'ControlAddIns') {
           singularType = 'ControlAddIn';
+        } else if (objectType === 'EnumExtensionTypes') {
+          singularType = 'EnumExtensionType';
         }
         
         this.processObjectArray(level[objectType], singularType, objects, packageName);
@@ -185,7 +189,9 @@ export class StreamingSymbolParser {
   private isObjectArray(key: string, value: any): boolean {
     return Array.isArray(value) && [
       'Tables', 'Pages', 'Codeunits', 'Reports', 'Queries', 'XmlPorts',
-      'Enums', 'EnumTypes', 'Interfaces', 'PermissionSets', 'ControlAddIns'
+      'Enums', 'EnumTypes', 'Interfaces', 'PermissionSets', 'ControlAddIns',
+      'TableExtensions', 'PageExtensions', 'EnumExtensionTypes',
+      'ReportExtensions', 'PermissionSetExtensions'
     ].some(objType => key.endsWith(objType));
   }
 
@@ -208,7 +214,12 @@ export class StreamingSymbolParser {
       'EnumTypes': 'Enum',
       'Interfaces': 'Interface',
       'PermissionSets': 'PermissionSet',
-      'ControlAddIns': 'ControlAddIn'
+      'ControlAddIns': 'ControlAddIn',
+      'TableExtensions': 'TableExtension',
+      'PageExtensions': 'PageExtension',
+      'EnumExtensionTypes': 'EnumExtensionType',
+      'ReportExtensions': 'ReportExtension',
+      'PermissionSetExtensions': 'PermissionSetExtension'
     };
 
     return typeMap[lastSegment] || lastSegment;
@@ -270,6 +281,16 @@ export class StreamingSymbolParser {
         return this.parseXmlPort(data, baseObject);
       case 'ControlAddIn':
         return this.parseControlAddIn(data, baseObject);
+      case 'TableExtension':
+        return this.parseTableExtension(data, baseObject);
+      case 'PageExtension':
+        return this.parsePageExtension(data, baseObject);
+      case 'EnumExtensionType':
+        return this.parseEnumExtension(data, baseObject);
+      case 'ReportExtension':
+        return this.parseReportExtension(data, baseObject);
+      case 'PermissionSetExtension':
+        return this.parsePermissionSetExtension(data, baseObject);
       default:
         return baseObject;
     }
@@ -510,6 +531,119 @@ export class StreamingSymbolParser {
     }
 
     return controlAddIn;
+  }
+
+  /**
+   * Extract the base object name from a TargetObject string
+   * Format: #appid#ObjectName
+   */
+  private extractTargetObjectName(targetObject: string): string {
+    const parts = targetObject.split('#').filter(p => p.length > 0);
+    return parts.length >= 2 ? parts[parts.length - 1] : targetObject;
+  }
+
+  /**
+   * Parse table extension-specific data
+   */
+  private parseTableExtension(data: any, baseObject: ALObject): ALObject {
+    if (data.TargetObject) {
+      const targetName = this.extractTargetObjectName(data.TargetObject);
+      baseObject.Properties = baseObject.Properties || [];
+      baseObject.Properties.push({ Name: 'Extends', Value: targetName });
+    }
+
+    if (data.Fields) {
+      (baseObject as any).Fields = data.Fields.map((fieldData: any) => this.parseField(fieldData));
+    }
+
+    // AL symbol files use "Methods" for procedures
+    if (data.Methods) {
+      (baseObject as any).Procedures = data.Methods.map((methodData: any) => this.parseProcedure(methodData));
+    } else if (data.Procedures) {
+      (baseObject as any).Procedures = data.Procedures.map((procData: any) => this.parseProcedure(procData));
+    }
+
+    return baseObject;
+  }
+
+  /**
+   * Parse page extension-specific data
+   */
+  private parsePageExtension(data: any, baseObject: ALObject): ALObject {
+    if (data.TargetObject) {
+      const targetName = this.extractTargetObjectName(data.TargetObject);
+      baseObject.Properties = baseObject.Properties || [];
+      baseObject.Properties.push({ Name: 'Extends', Value: targetName });
+    }
+
+    if (data.ControlChanges) {
+      (baseObject as any).ControlChanges = data.ControlChanges;
+    }
+
+    return baseObject;
+  }
+
+  /**
+   * Parse enum extension-specific data
+   */
+  private parseEnumExtension(data: any, baseObject: ALObject): ALObject {
+    if (data.TargetObject) {
+      const targetName = this.extractTargetObjectName(data.TargetObject);
+      baseObject.Properties = baseObject.Properties || [];
+      baseObject.Properties.push({ Name: 'Extends', Value: targetName });
+    }
+
+    if (data.Values) {
+      (baseObject as any).Values = data.Values.map((valueData: any) => ({
+        Id: valueData.Id || 0,
+        Name: valueData.Name || '',
+        Properties: this.parseProperties(valueData.Properties)
+      }));
+    }
+
+    return baseObject;
+  }
+
+  /**
+   * Parse report extension-specific data
+   */
+  private parseReportExtension(data: any, baseObject: ALObject): ALObject {
+    // ReportExtensions use "Target" instead of "TargetObject"
+    if (data.Target) {
+      baseObject.Properties = baseObject.Properties || [];
+      baseObject.Properties.push({ Name: 'Extends', Value: data.Target });
+    } else if (data.TargetObject) {
+      const targetName = this.extractTargetObjectName(data.TargetObject);
+      baseObject.Properties = baseObject.Properties || [];
+      baseObject.Properties.push({ Name: 'Extends', Value: targetName });
+    }
+
+    if (data.DataItems) {
+      (baseObject as any).Dataset = this.parseDataItems(data.DataItems);
+    }
+
+    if (data.Columns) {
+      (baseObject as any).Columns = data.Columns.map((column: any) => ({
+        Name: column.Name || '',
+        SourceExpr: column.SourceExpr || column.SourceExpression,
+        Properties: this.parseProperties(column.Properties)
+      }));
+    }
+
+    return baseObject;
+  }
+
+  /**
+   * Parse permission set extension-specific data
+   */
+  private parsePermissionSetExtension(data: any, baseObject: ALObject): ALObject {
+    if (data.TargetObject) {
+      const targetName = this.extractTargetObjectName(data.TargetObject);
+      baseObject.Properties = baseObject.Properties || [];
+      baseObject.Properties.push({ Name: 'Extends', Value: targetName });
+    }
+
+    return baseObject;
   }
 
   /**
