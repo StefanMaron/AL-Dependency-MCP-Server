@@ -12,6 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Strip trailing null characters from JSON to fix AppSource package parsing (#12)
 - Extract manifest and symbols directly from .app files via ZIP, with AL CLI fallback for packages requiring conversion (#13)
 
+## [2.4.0] - 2026-02-09
+
+### Added
+- compile AL test fixtures on demand in CI via dotnet/NuGet
+- add support for extension object types (TableExtension, PageExtension, EnumExtensionType, ReportExtension, PermissionSetExtension)
+
+### Fixed
+- remove stale BUG comments and fix Report DataItems property name
+
+### Changed
+- Merge pull request #19 from StefanMaron/feature/extension-objects-support
+
 ## [2.3.1] - 2026-02-09
 
 ### Fixed
