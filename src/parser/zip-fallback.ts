@@ -25,17 +25,10 @@ export class ZipFallbackExtractor {
    * Extract SymbolReference.json from AL symbol package using yauzl
    */
   async extractSymbolReference(symbolPackagePath: string): Promise<Readable> {
-    // AL packages have a 40-byte NAVX header - skip it and read ZIP directly
+    // AL packages have a 40-byte NAVX header and signed packages have
+    // trailing signature bytes - extract just the ZIP portion
     const buffer = await fs.readFile(symbolPackagePath);
-    
-    // Find ZIP signature (PK header at byte 40)
-    const zipStart = this.findZipStart(buffer);
-    if (zipStart === -1) {
-      throw new Error('Not a valid AL package - ZIP signature not found');
-    }
-    
-    // Extract just the ZIP portion
-    const zipBuffer = buffer.slice(zipStart);
+    const zipBuffer = this.getZipBuffer(buffer);
     
     // Open ZIP from buffer using yauzl
     return new Promise((resolve, reject) => {
@@ -89,13 +82,7 @@ export class ZipFallbackExtractor {
    */
   async extractManifest(alPackagePath: string): Promise<ExtractedManifest> {
     const buffer = await fs.readFile(alPackagePath);
-    const zipStart = this.findZipStart(buffer);
-    
-    if (zipStart === -1) {
-      throw new Error('Not a valid AL package - ZIP signature not found');
-    }
-    
-    const zipBuffer = buffer.slice(zipStart);
+    const zipBuffer = this.getZipBuffer(buffer);
     
     return new Promise((resolve, reject) => {
       yauzl.fromBuffer(zipBuffer, { lazyEntries: true }, (err, zipfile) => {
@@ -194,6 +181,25 @@ export class ZipFallbackExtractor {
   }
 
   /**
+   * Extract the ZIP portion from an AL package buffer, stripping the NAVX
+   * header and any trailing signature bytes (signed packages).
+   * Returns just the ZIP data that yauzl can parse cleanly.
+   */
+  private getZipBuffer(buffer: Buffer): Buffer {
+    const zipStart = this.findZipStart(buffer);
+    if (zipStart === -1) {
+      throw new Error('Not a valid AL package - ZIP signature not found');
+    }
+
+    const zipEnd = this.findZipEnd(buffer, zipStart);
+    if (zipEnd !== -1) {
+      return buffer.slice(zipStart, zipEnd);
+    }
+    // Fallback: no EOCD found, return everything from zipStart (original behavior)
+    return buffer.slice(zipStart);
+  }
+
+  /**
    * Find ZIP signature in AL package buffer
    * AL packages have 40-byte NAVX header followed by ZIP data
    */
@@ -202,6 +208,41 @@ export class ZipFallbackExtractor {
     for (let i = 0; i < Math.min(buffer.length, 100); i++) {
       if (buffer[i] === 0x50 && buffer[i + 1] === 0x4B) {
         return i;
+      }
+    }
+    return -1;
+  }
+
+  /**
+   * Find the end of ZIP data by locating the End of Central Directory (EOCD) record.
+   * Signed AL packages have trailing signature bytes (ending with NXSB magic)
+   * after the ZIP data. yauzl rejects these extra bytes, so we must trim them.
+   *
+   * EOCD record structure (22 bytes minimum):
+   *   Signature: 0x50 0x4B 0x05 0x06 (4 bytes)
+   *   ... fixed fields ...          (16 bytes)
+   *   Comment length:               (2 bytes at offset 20)
+   *   Comment:                      (variable)
+   *
+   * Returns the byte offset (relative to start of buffer) where ZIP data ends,
+   * or -1 if EOCD is not found.
+   */
+  private findZipEnd(buffer: Buffer, zipStart: number): number {
+    // EOCD signature: PK\x05\x06
+    // Scan backward from the end of the buffer to find it.
+    // The EOCD is at least 22 bytes, and the comment can be up to 65535 bytes,
+    // so we need to scan at most 22 + 65535 = 65557 bytes from the end.
+    const maxScan = Math.min(buffer.length - zipStart, 65557);
+    const scanStart = buffer.length - 4;
+    const scanEnd = buffer.length - maxScan;
+
+    for (let i = scanStart; i >= scanEnd && i >= zipStart; i--) {
+      if (buffer[i] === 0x50 && buffer[i + 1] === 0x4B &&
+          buffer[i + 2] === 0x05 && buffer[i + 3] === 0x06) {
+        // Found EOCD - read comment length (2 bytes, little-endian, at offset 20)
+        const commentLength = buffer.readUInt16LE(i + 20);
+        // ZIP data ends right after the EOCD record + comment
+        return i + 22 + commentLength;
       }
     }
     return -1;
