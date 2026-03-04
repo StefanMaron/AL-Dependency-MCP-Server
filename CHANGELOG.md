@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Strip trailing null characters from JSON to fix AppSource package parsing (#12)
 - Extract manifest and symbols directly from .app files via ZIP, with AL CLI fallback for packages requiring conversion (#13)
 
+## [2.5.0] - 2026-03-04
+
+### Added
+- address PR review feedback
+
+### Fixed
+- Merge pull request #24 from StefanMaron/fix/signed-app-nxsb-trailer
+- use pure JS CRC-32 in tests for Node 18 compatibility
+- handle signed .app packages with NXSB trailing signature data
+
 ## [2.4.0] - 2026-02-09
 
 ### Added
