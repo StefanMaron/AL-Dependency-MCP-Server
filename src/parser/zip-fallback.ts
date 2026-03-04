@@ -33,9 +33,10 @@ export class ZipFallbackExtractor {
     if (zipStart === -1) {
       throw new Error('Not a valid AL package - ZIP signature not found');
     }
-    
-    // Extract just the ZIP portion
-    const zipBuffer = buffer.slice(zipStart);
+
+    // Extract just the ZIP portion, excluding any trailing NXSB signature data
+    const zipEnd = this.findZipEnd(buffer);
+    const zipBuffer = buffer.slice(zipStart, zipEnd);
     
     // Open ZIP from buffer using yauzl
     return new Promise((resolve, reject) => {
@@ -90,12 +91,14 @@ export class ZipFallbackExtractor {
   async extractManifest(alPackagePath: string): Promise<ExtractedManifest> {
     const buffer = await fs.readFile(alPackagePath);
     const zipStart = this.findZipStart(buffer);
-    
+
     if (zipStart === -1) {
       throw new Error('Not a valid AL package - ZIP signature not found');
     }
-    
-    const zipBuffer = buffer.slice(zipStart);
+
+    // Exclude any trailing NXSB signature data from signed packages
+    const zipEnd = this.findZipEnd(buffer);
+    const zipBuffer = buffer.slice(zipStart, zipEnd);
     
     return new Promise((resolve, reject) => {
       yauzl.fromBuffer(zipBuffer, { lazyEntries: true }, (err, zipfile) => {
@@ -205,6 +208,32 @@ export class ZipFallbackExtractor {
       }
     }
     return -1;
+  }
+
+  /**
+   * Find the true end of the ZIP data in the buffer.
+   * Signed AL packages have an NXSB trailer (~10KB) after the ZIP data
+   * that causes yauzl to reject the buffer with "Invalid comment length".
+   * This method scans backwards for the EOCD record and calculates the
+   * actual ZIP end position, excluding any trailing signature data.
+   */
+  private findZipEnd(buffer: Buffer): number {
+    // EOCD signature: PK\x05\x06 (0x50 0x4B 0x05 0x06)
+    // EOCD can be at most 22 bytes (fixed) + 65535 bytes (max comment) from end
+    const maxSearch = Math.min(buffer.length, 22 + 65535);
+    const searchStart = buffer.length - maxSearch;
+
+    for (let i = buffer.length - 22; i >= searchStart; i--) {
+      if (buffer[i] === 0x50 && buffer[i + 1] === 0x4B &&
+          buffer[i + 2] === 0x05 && buffer[i + 3] === 0x06) {
+        // Found EOCD - read comment length at offset 20 (2 bytes, little-endian)
+        const commentLength = buffer.readUInt16LE(i + 20);
+        return i + 22 + commentLength;
+      }
+    }
+
+    // No EOCD found - return full buffer length as fallback
+    return buffer.length;
   }
 
   /**
