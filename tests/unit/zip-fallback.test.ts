@@ -3,6 +3,24 @@ import * as os from 'os';
 import * as fs from 'fs';
 import { ZipFallbackExtractor } from '../../src/parser/zip-fallback';
 
+/** CRC-32 lookup table (compatible with Node 18 which lacks zlib.crc32) */
+const CRC32_TABLE = new Uint32Array(256);
+for (let i = 0; i < 256; i++) {
+  let c = i;
+  for (let j = 0; j < 8; j++) {
+    c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+  }
+  CRC32_TABLE[i] = c;
+}
+
+function crc32(buf: Buffer): number {
+  let crc = 0xFFFFFFFF;
+  for (let i = 0; i < buf.length; i++) {
+    crc = CRC32_TABLE[(crc ^ buf[i]) & 0xFF] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
 /**
  * Build a minimal valid ZIP buffer containing a single uncompressed file.
  * Constructs the ZIP manually: local file header + data + central directory + EOCD.
@@ -11,9 +29,7 @@ function buildZipBuffer(fileName: string, content: string): Buffer {
   const fileNameBuf = Buffer.from(fileName, 'utf8');
   const fileData = Buffer.from(content, 'utf8');
 
-  // CRC-32 using Node.js zlib
-  const zlib = require('zlib');
-  const crc = zlib.crc32(fileData);
+  const crc = crc32(fileData);
 
   // Local file header (30 bytes + filename)
   const lfh = Buffer.alloc(30 + fileNameBuf.length);
