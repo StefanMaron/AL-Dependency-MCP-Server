@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as os from 'os';
 import * as fs from 'fs';
 import { ZipFallbackExtractor } from '../src/parser/zip-fallback';
 
@@ -15,10 +16,12 @@ const describeOrSkip = fixtureExists ? describe : describe.skip;
  */
 describeOrSkip('Signed .app integration tests (compiled fixtures)', () => {
   let extractor: ZipFallbackExtractor;
+  let tmpDir: string;
   let signedAppPath: string;
 
   beforeAll(() => {
     extractor = new ZipFallbackExtractor();
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'signed-app-test-'));
 
     // Create a signed version by appending an NXSB trailer
     const originalBuffer = fs.readFileSync(FIXTURE_APP);
@@ -29,14 +32,12 @@ describeOrSkip('Signed .app integration tests (compiled fixtures)', () => {
     trailer.write('NXSB', trailer.length - 4, 'ascii');
 
     const signedBuffer = Buffer.concat([originalBuffer, trailer]);
-    signedAppPath = path.join(FIXTURE_DIR, 'TestPublisher_Base Test App_1.0.0.0_signed.app');
+    signedAppPath = path.join(tmpDir, 'signed.app');
     fs.writeFileSync(signedAppPath, signedBuffer);
   });
 
   afterAll(() => {
-    if (fs.existsSync(signedAppPath)) {
-      fs.unlinkSync(signedAppPath);
-    }
+    fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
   it('should extract identical manifest from unsigned and signed fixture', async () => {

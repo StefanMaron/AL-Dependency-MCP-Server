@@ -219,9 +219,9 @@ export class ZipFallbackExtractor {
    */
   private findZipEnd(buffer: Buffer): number {
     // EOCD signature: PK\x05\x06 (0x50 0x4B 0x05 0x06)
-    // EOCD can be at most 22 bytes (fixed) + 65535 bytes (max comment) from end
-    const maxSearch = Math.min(buffer.length, 22 + 65535);
-    const searchStart = buffer.length - maxSearch;
+    // Scan backwards from end to zipStart to handle any amount of trailing data
+    const zipStart = this.findZipStart(buffer);
+    const searchStart = zipStart >= 0 ? zipStart : 0;
 
     for (let i = buffer.length - 22; i >= searchStart; i--) {
       if (buffer[i] === 0x50 && buffer[i + 1] === 0x4B &&
