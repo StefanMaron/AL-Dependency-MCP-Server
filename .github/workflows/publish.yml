@@ -194,25 +194,21 @@ jobs:
 
       - name: Create GitHub Release (manual trigger)
         if: github.event_name == 'workflow_dispatch'
-        uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ env.NEW_VERSION }}
-          release_name: v${{ env.NEW_VERSION }}
-          body: |
-            ## Changes in v${{ env.NEW_VERSION }}
-            
-            Auto-generated release from workflow dispatch.
-            
-            **Installation:**
-            ```bash
-            npx al-mcp-server@${{ env.NEW_VERSION }}
-            ```
-            
-            **What's Changed:**
-            - Version bump to ${{ env.NEW_VERSION }}
-            
-            **Full Changelog:** [${{ env.NEW_VERSION }}](https://github.com/StefanMaron/AL-Dependency-MCP-Server/releases/tag/v${{ env.NEW_VERSION }})
-          draft: false
-          prerelease: false
+        run: |
+          gh release create "v${{ env.NEW_VERSION }}" \
+            --title "v${{ env.NEW_VERSION }}" \
+            --notes "## Changes in v${{ env.NEW_VERSION }}
+
+          Auto-generated release from workflow dispatch.
+
+          **Installation:**
+          \`\`\`bash
+          npx al-mcp-server@${{ env.NEW_VERSION }}
+          \`\`\`
+
+          **What's Changed:**
+          - Version bump to ${{ env.NEW_VERSION }}
+
+          **Full Changelog:** [${{ env.NEW_VERSION }}](https://github.com/StefanMaron/AL-Dependency-MCP-Server/releases/tag/v${{ env.NEW_VERSION }})"
