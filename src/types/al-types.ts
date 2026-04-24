@@ -154,6 +154,8 @@ export interface ALPackageInfo {
   publisher: string;
   dependencies: ALPackageDependency[];
   filePath: string;
+  repositoryUrl?: string;
+  commit?: string;
 }
 
 export interface ALPackageDependency {
