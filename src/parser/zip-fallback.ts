@@ -14,6 +14,8 @@ export interface ExtractedManifest {
     publisher: string;
     version: string;
   }[];
+  repositoryUrl?: string;
+  commit?: string;
 }
 
 /**
@@ -160,6 +162,10 @@ export class ZipFallbackExtractor {
     const publisher = getAttrValue('App', 'Publisher') || getTagValue('Publisher');
     const version = getAttrValue('App', 'Version') || getTagValue('Version');
 
+    // Extract repository URL and commit hash from <Source RepositoryUrl="..." Commit="..." /> element
+    const repositoryUrl = getAttrValue('Source', 'RepositoryUrl') || undefined;
+    const commit = getAttrValue('Source', 'Commit') || undefined;
+
     // Extract dependencies
     const dependencies: ExtractedManifest['dependencies'] = [];
     const depRegex = /<Dependency[^>]*Id="([^"]*)"[^>]*Name="([^"]*)"[^>]*Publisher="([^"]*)"[^>]*(?:MinVersion|Version)="([^"]*)"/gi;
@@ -192,7 +198,9 @@ export class ZipFallbackExtractor {
       name,
       publisher,
       version,
-      dependencies: dependencies.length > 0 ? dependencies : undefined
+      dependencies: dependencies.length > 0 ? dependencies : undefined,
+      repositoryUrl: repositoryUrl || undefined,
+      commit: commit || undefined
     };
   }
 

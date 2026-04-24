@@ -14,6 +14,10 @@ export interface ALAppManifest {
     publisher: string;
     version: string;
   }[];
+  source?: {
+    repositoryUrl?: string;
+    commit?: string;
+  };
 }
 
 export class ALCliWrapper {

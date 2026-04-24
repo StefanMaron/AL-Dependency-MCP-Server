@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Extract repository URL and commit hash from AL package manifests (NavxManifest.xml and AL CLI) and expose via `al_packages` list
+
 ### Fixed
 - Parse and index procedures for Table objects (#11)
 - Strip trailing null characters from JSON to fix AppSource package parsing (#12)

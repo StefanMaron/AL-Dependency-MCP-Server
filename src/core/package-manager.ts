@@ -176,7 +176,9 @@ export class ALPackageManager {
         id: dep.id,
         version: dep.version
       })),
-      filePath: packagePath
+      filePath: packagePath,
+      repositoryUrl: manifest.repositoryUrl,
+      commit: manifest.commit
     };
 
     return {
@@ -218,7 +220,9 @@ export class ALPackageManager {
           id: dep.id,
           version: dep.version
         })),
-        filePath: packagePath
+        filePath: packagePath,
+        repositoryUrl: manifest.source?.repositoryUrl,
+        commit: manifest.source?.commit
       };
 
       return {
