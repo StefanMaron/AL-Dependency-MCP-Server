@@ -1,6 +1,7 @@
 import {
   SearchObjectsArgs,
   GetObjectDefinitionArgs,
+  GetObjectSourceArgs,
   FindReferencesArgs,
   LoadPackagesArgs,
   SearchProceduresArgs,
@@ -11,6 +12,7 @@ import {
   FindFieldUsageArgs,
   SearchObjectsResult,
   GetObjectDefinitionResult,
+  GetObjectSourceResult,
   FindReferencesResult,
   LoadPackagesResult,
   ListPackagesResult,
@@ -21,9 +23,11 @@ import {
   FindFieldReferencesResult,
   FindFieldUsageResult
 } from '../types/mcp-types';
-import { ALObjectDefinition, ALFieldReference } from '../types/al-types';
+import { ALObjectDefinition, ALFieldReference, ALObject } from '../types/al-types';
 import { OptimizedSymbolDatabase } from '../core/symbol-database';
 import { ALPackageManager } from '../core/package-manager';
+import { buildSourceZipEntries, matchSourceEntry, normalizePath } from '../parser/source-matcher';
+import { findMemberRange } from '../parser/source-member-locator';
 
 export class ALMCPTools {
   constructor(
@@ -51,6 +55,19 @@ NOTE: For documentation and code examples, use microsoft_docs_search or microsof
       };
     }
     return { isEmpty: false };
+  }
+
+  /**
+   * Whether an object's source can be retrieved via getObjectSource:
+   * its package must ship source and the object must carry a source reference.
+   */
+  private isSourceAvailable(object: any): boolean {
+    if (!object?.PackageName || !object?.ReferenceSourceFileName) {
+      return false;
+    }
+
+    const packageInfo = this.packageManager.getPackageInfo(object.PackageName);
+    return packageInfo?.hasSourceCode === true;
   }
 
   /**
@@ -84,7 +101,12 @@ NOTE: For documentation and code examples, use microsoft_docs_search or microsof
 
       // Enrich with additional data if requested
       const enrichedObjects = paginatedObjects.map(obj => {
-        let enriched = { ...obj };
+        // Placed first so sourceAvailable survives truncation/summarization of the response
+        const sourceAvailable = this.isSourceAvailable(obj);
+        let enriched: ALObject = {
+          sourceAvailable,
+          ...obj
+        };
         
         // In summary mode, limit the detail included
         if (summaryMode) {
@@ -191,7 +213,10 @@ NOTE: For documentation and code examples, use microsoft_docs_search or microsof
       const procedureLimit = args.procedureLimit || (summaryMode ? 10 : 50);
 
       // Build definition with intelligent limiting
+      // sourceAvailable placed first so it survives truncation/summarization of the response
+      const sourceAvailable = this.isSourceAvailable(object);
       const definition: ALObjectDefinition = {
+        sourceAvailable,
         ...object,
         Fields: undefined,
         Procedures: undefined,
@@ -243,6 +268,135 @@ NOTE: For documentation and code examples, use microsoft_docs_search or microsof
     } catch (error) {
       throw new Error(`Get object definition failed: ${error}`);
     }
+  }
+
+  /**
+   * Get the real AL source of an object, extracted from its package's embedded .al files.
+   * Supports returning the whole object, a named member (procedure/trigger) ± context lines,
+   * or an explicit line range.
+   */
+  async getObjectSource(args: GetObjectSourceArgs): Promise<GetObjectSourceResult> {
+    const startTime = Date.now();
+
+    try {
+      const dbCheck = this.checkDatabaseLoaded();
+      if (dbCheck.isEmpty) {
+        throw new Error(dbCheck.message!);
+      }
+
+      let object: any;
+
+      if (args.objectId && args.objectType) {
+        const key = `${args.objectType}:${args.objectId}`;
+        object = this.database.getObjectById(key);
+      } else if (args.objectName) {
+        const results = this.database.searchObjects(args.objectName, args.objectType, args.packageName);
+        object = results.find(o => o.Name === args.objectName);
+      }
+
+      if (!object) {
+        const identifier = args.objectId ? `${args.objectType} ${args.objectId}` : args.objectName;
+        throw new Error(`Object not found: ${identifier}`);
+      }
+
+      if (args.packageName && object.PackageName !== args.packageName) {
+        const identifier = args.objectId ? `${args.objectType} ${args.objectId}` : args.objectName;
+        throw new Error(`Object ${identifier} not found in package ${args.packageName}`);
+      }
+
+      const packageName: string = object.PackageName;
+      const packageInfo = this.packageManager.getPackageInfo(packageName);
+
+      if (!packageInfo || !packageInfo.hasSourceCode) {
+        throw new Error(`Package '${packageName}' ships no source: it is symbol-only or source-protected.`);
+      }
+
+      const referenceSourceFileName: string | undefined = object.ReferenceSourceFileName;
+      if (!referenceSourceFileName) {
+        throw new Error(`Object '${object.Name}' has no source reference.`);
+      }
+
+      const rawSourceEntries = this.packageManager.getSourceEntries(packageName) || [];
+      const sourceZipEntries = buildSourceZipEntries(rawSourceEntries);
+      const matchedEntry = matchSourceEntry(sourceZipEntries, referenceSourceFileName);
+
+      if (!matchedEntry) {
+        const candidates = rawSourceEntries.slice(0, 10);
+        throw new Error(
+          `Source file for '${object.Name}' (${referenceSourceFileName}) was not found in package '${packageName}'. ` +
+          `Candidate entries: ${candidates.join(', ') || '(none)'}`
+        );
+      }
+
+      const sourceText = await this.packageManager.extractSourceFile(packageName, matchedEntry);
+      const lines = sourceText.split(/\r\n|\n/);
+      const totalLines = lines.length;
+      const byteSize = Buffer.byteLength(sourceText, 'utf8');
+
+      let mode: 'full' | 'member' | 'range' = 'full';
+      let startLine = 1;
+      let endLine = totalLines;
+      let memberMatches: string[] | undefined;
+
+      if (args.member) {
+        const range = findMemberRange(lines, args.member);
+
+        if (!range) {
+          memberMatches = this.getCandidateMemberNames(object);
+        } else {
+          mode = 'member';
+          const contextLines = args.contextLines ?? 3;
+          startLine = Math.max(1, range.start + 1 - contextLines);
+          endLine = Math.min(totalLines, range.end + 1 + contextLines);
+        }
+      } else if (args.startLine !== undefined || args.endLine !== undefined) {
+        mode = 'range';
+        startLine = Math.max(1, args.startLine || 1);
+        endLine = Math.min(totalLines, args.endLine || totalLines);
+      }
+
+      const selectedLines = lines.slice(startLine - 1, endLine);
+      const content = selectedLines.map((line, idx) => `${startLine + idx}: ${line}`).join('\n');
+
+      const warningThreshold = 1500;
+      let warning: string | undefined;
+      if (mode === 'full' && totalLines > warningThreshold) {
+        warning = `Object has ${totalLines} lines; consider narrowing with 'member' or 'startLine'/'endLine'.`;
+      }
+
+      const executionTime = Date.now() - startTime;
+
+      return {
+        objectType: object.Type,
+        objectName: object.Name,
+        objectId: object.Id,
+        packageName,
+        sourceFilePath: normalizePath(matchedEntry),
+        totalLines,
+        byteSize,
+        mode,
+        returnedLines: { start: startLine, end: endLine },
+        truncated: false,
+        warning,
+        content,
+        memberMatches,
+        executionTimeMs: executionTime
+      };
+    } catch (error) {
+      throw new Error(`Get object source failed: ${error}`);
+    }
+  }
+
+  /**
+   * Candidate member names (procedures/fields) to suggest when a requested member isn't found
+   */
+  private getCandidateMemberNames(object: any): string[] {
+    const procedureNames = this.database.getObjectProcedures(object.Name).map(p => p.Name);
+    const fieldNames = (object.Type === 'Table' || object.Type === 'TableExtension')
+      ? this.database.getTableFields(object.Name).map(f => f.Name)
+      : [];
+
+    return [...procedureNames, ...fieldNames].slice(0, 30);
   }
 
   /**
@@ -978,7 +1132,8 @@ NOTE: For documentation and code examples, use microsoft_docs_search or microsof
           Name: targetObject.Name,
           Type: targetObject.Type,
           Id: targetObject.Id,
-          PackageName: targetObject.PackageName
+          PackageName: targetObject.PackageName,
+          sourceAvailable: this.isSourceAvailable(targetObject)
         },
         summary: {
           name: targetObject.Name,

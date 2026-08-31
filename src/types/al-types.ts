@@ -24,6 +24,8 @@ export interface ALObject {
   Properties?: ALProperty[];
   ReferenceSourceFileName?: string;
   PackageName?: string;
+  /** Whether al_get_object_source can retrieve real source for this object. */
+  sourceAvailable?: boolean;
 }
 
 export interface ALTable extends ALObject {
@@ -154,6 +156,8 @@ export interface ALPackageInfo {
   publisher: string;
   dependencies: ALPackageDependency[];
   filePath: string;
+  hasSourceCode?: boolean;
+  sourceFileCount?: number;
 }
 
 export interface ALPackageDependency {

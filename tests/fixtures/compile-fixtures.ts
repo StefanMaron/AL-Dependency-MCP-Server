@@ -22,6 +22,11 @@ const EXT_APP_DIR = path.join(FIXTURES_DIR, 'ext-app');
 const BASE_APP_OUTPUT = path.join(COMPILED_DIR, 'TestPublisher_Base Test App_1.0.0.0.app');
 const EXT_APP_OUTPUT = path.join(COMPILED_DIR, 'TestPublisher_Extension Test App_1.0.0.0.app');
 
+// Raw compiled apps (pre-CreateSymbolPackage) embed source under src/ - kept as a
+// source-bearing fixture for al_get_object_source tests instead of being deleted.
+export const BASE_APP_RAW_OUTPUT = path.join(COMPILED_DIR, 'base-raw.app');
+export const EXT_APP_RAW_OUTPUT = path.join(COMPILED_DIR, 'ext-raw.app');
+
 function execAL(alPath: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     const proc = spawn(alPath, args, { stdio: ['pipe', 'pipe', 'pipe'] });
@@ -61,7 +66,8 @@ async function fileExists(filePath: string): Promise<boolean> {
 
 async function compileFixtures(): Promise<void> {
   // Check if compiled files already exist
-  if (await fileExists(BASE_APP_OUTPUT) && await fileExists(EXT_APP_OUTPUT)) {
+  if (await fileExists(BASE_APP_OUTPUT) && await fileExists(EXT_APP_OUTPUT) &&
+      await fileExists(BASE_APP_RAW_OUTPUT) && await fileExists(EXT_APP_RAW_OUTPUT)) {
     return;
   }
 
@@ -89,38 +95,35 @@ async function compileFixtures(): Promise<void> {
 
   // Step 1: Compile base app
   console.log('[compile-fixtures] Compiling base app...');
-  const baseRawApp = path.join(COMPILED_DIR, 'base-raw.app');
   await execAL(alPath, [
     'compile',
     `/project:${BASE_APP_DIR}`,
     `/packagecachepath:${path.join(BASE_APP_DIR, '.alpackages')}`,
-    `/out:${baseRawApp}`
+    `/out:${BASE_APP_RAW_OUTPUT}`
   ]);
 
   // Step 2: Create symbol package from base app
   console.log('[compile-fixtures] Creating base app symbol package...');
-  await execAL(alPath, ['CreateSymbolPackage', baseRawApp, BASE_APP_OUTPUT]);
+  await execAL(alPath, ['CreateSymbolPackage', BASE_APP_RAW_OUTPUT, BASE_APP_OUTPUT]);
 
   // Step 3: Copy base app symbol package to ext-app's .alpackages (it depends on it)
   await fs.copyFile(BASE_APP_OUTPUT, path.join(EXT_APP_DIR, '.alpackages', path.basename(BASE_APP_OUTPUT)));
 
   // Step 4: Compile extension app
   console.log('[compile-fixtures] Compiling extension app...');
-  const extRawApp = path.join(COMPILED_DIR, 'ext-raw.app');
   await execAL(alPath, [
     'compile',
     `/project:${EXT_APP_DIR}`,
     `/packagecachepath:${path.join(EXT_APP_DIR, '.alpackages')}`,
-    `/out:${extRawApp}`
+    `/out:${EXT_APP_RAW_OUTPUT}`
   ]);
 
   // Step 5: Create symbol package from extension app
   console.log('[compile-fixtures] Creating extension app symbol package...');
-  await execAL(alPath, ['CreateSymbolPackage', extRawApp, EXT_APP_OUTPUT]);
+  await execAL(alPath, ['CreateSymbolPackage', EXT_APP_RAW_OUTPUT, EXT_APP_OUTPUT]);
 
-  // Clean up intermediate raw .app files
-  await fs.unlink(baseRawApp).catch(() => {});
-  await fs.unlink(extRawApp).catch(() => {});
+  // Note: the raw .app files (BASE_APP_RAW_OUTPUT/EXT_APP_RAW_OUTPUT) are kept -
+  // they embed source under src/ and are used as a source-bearing test fixture.
 
   console.log('[compile-fixtures] Fixture compilation complete.');
 }
