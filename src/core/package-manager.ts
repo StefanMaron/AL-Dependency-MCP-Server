@@ -20,6 +20,8 @@ export class ALPackageManager {
   private zipExtractor: ZipFallbackExtractor;
   private database: OptimizedSymbolDatabase;
   private progressCallback?: (progress: ParseProgress) => void;
+  private loadedPackageInfos = new Map<string, ALPackageInfo>();
+  private sourceEntriesByPackage = new Map<string, string[]>();
 
   constructor(
     alCli?: ALCliWrapper,
@@ -71,6 +73,8 @@ export class ALPackageManager {
 
     if (forceReload) {
       this.database.clear();
+      this.loadedPackageInfos.clear();
+      this.sourceEntriesByPackage.clear();
     }
 
     // Filter to only use the most recent version of each package
@@ -154,11 +158,12 @@ export class ALPackageManager {
     packageInfo: ALPackageInfo;
     objectCount: number;
   }> {
-    // Extract manifest directly from .app file via ZIP extraction
-    const manifest = await this.zipExtractor.extractManifest(packagePath);
+    // Single ZIP open: manifest + source-availability flag + .al entry list + symbol JSON
+    const inspection = await this.zipExtractor.inspectPackage(packagePath);
+    const manifest = inspection.manifest;
 
-    // Parse symbols directly from .app file
-    const objects = await this.parser.parseSymbolPackage(packagePath, manifest.name);
+    // Parse symbols from the already-extracted JSON text
+    const objects = this.parser.parseSymbolReferenceText(inspection.symbolReferenceJson, manifest.name);
 
     // Add objects to database
     for (const obj of objects) {
@@ -176,8 +181,13 @@ export class ALPackageManager {
         id: dep.id,
         version: dep.version
       })),
-      filePath: packagePath
+      filePath: packagePath,
+      hasSourceCode: inspection.hasSourceCode,
+      sourceFileCount: inspection.sourceEntries.length
     };
+
+    this.loadedPackageInfos.set(packageInfo.name, packageInfo);
+    this.sourceEntriesByPackage.set(packageInfo.name, inspection.sourceEntries);
 
     return {
       packageInfo,
@@ -208,6 +218,7 @@ export class ALPackageManager {
       }
 
       // Create package info
+      // AL CLI symbol extraction produces JSON only - no embedded source
       const packageInfo: ALPackageInfo = {
         name: manifest.name,
         id: manifest.id,
@@ -218,8 +229,13 @@ export class ALPackageManager {
           id: dep.id,
           version: dep.version
         })),
-        filePath: packagePath
+        filePath: packagePath,
+        hasSourceCode: false,
+        sourceFileCount: 0
       };
+
+      this.loadedPackageInfos.set(packageInfo.name, packageInfo);
+      this.sourceEntriesByPackage.set(packageInfo.name, []);
 
       return {
         packageInfo,
@@ -242,23 +258,33 @@ export class ALPackageManager {
    * Get loaded package information
    */
   getLoadedPackages(): ALPackageInfo[] {
-    const packages: ALPackageInfo[] = [];
-    const packageSummary = this.database.getPackageSummary();
-    
-    // This is a simplified version - in a full implementation,
-    // we'd store the full package info alongside the objects
-    for (const [packageName] of packageSummary) {
-      packages.push({
-        name: packageName,
-        id: '', // Would need to be stored during loading
-        version: '',
-        publisher: '',
-        dependencies: [],
-        filePath: ''
-      });
+    return Array.from(this.loadedPackageInfos.values());
+  }
+
+  /**
+   * Get full package info (incl. hasSourceCode/filePath) for a single loaded package
+   */
+  getPackageInfo(packageName: string): ALPackageInfo | undefined {
+    return this.loadedPackageInfos.get(packageName);
+  }
+
+  /**
+   * Get the raw (stored) .al entry names discovered in a package's ZIP at load time
+   */
+  getSourceEntries(packageName: string): string[] | undefined {
+    return this.sourceEntriesByPackage.get(packageName);
+  }
+
+  /**
+   * Extract a single source file's text from a loaded package by its raw entry name
+   */
+  async extractSourceFile(packageName: string, rawEntryName: string): Promise<string> {
+    const packageInfo = this.loadedPackageInfos.get(packageName);
+    if (!packageInfo) {
+      throw new Error(`Package not loaded: ${packageName}`);
     }
 
-    return packages;
+    return this.zipExtractor.extractEntry(packageInfo.filePath, rawEntryName);
   }
 
   /**

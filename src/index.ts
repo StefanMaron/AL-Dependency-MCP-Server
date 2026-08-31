@@ -56,7 +56,7 @@ export class ALMCPServer {
         tools: [
           {
             name: 'al_search_objects',
-            description: 'Search AL objects in YOUR WORKSPACE (.app packages). Analyzes compiled AL code structure. Use summaryMode:true & limit for token efficiency. For complex objects prefer al_get_object_summary. Supports domain filtering.',
+            description: 'Search AL objects in YOUR WORKSPACE (.app packages). Returns compiled code STRUCTURE ONLY (fields, keys, procedure signatures) - never procedure/trigger bodies. Use summaryMode:true & limit for token efficiency. For complex objects prefer al_get_object_summary. Supports domain filtering. Each result includes sourceAvailable: for actual source code (procedure bodies, trigger logic), call al_get_object_source instead.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -108,7 +108,7 @@ export class ALMCPServer {
           },
           {
             name: 'al_get_object_definition',
-            description: 'Get AL object definition from YOUR WORKSPACE. Retrieves compiled code structure by ID or name. Use summaryMode:true for token efficiency. Use limits for large objects.',
+            description: 'Get AL object definition from YOUR WORKSPACE by ID or name. Returns compiled code STRUCTURE ONLY (fields, keys, procedure signatures) - never procedure/trigger bodies. Use summaryMode:true for token efficiency. Use limits for large objects. The result includes sourceAvailable: for actual source code (procedure bodies, trigger logic), call al_get_object_source instead.',
             inputSchema: {
               type: 'object',
               properties: {
@@ -151,6 +151,49 @@ export class ALMCPServer {
                 procedureLimit: {
                   type: 'number',
                   description: 'Max procedures (10 summary/50 full)',
+                },
+              },
+            },
+          },
+          {
+            name: 'al_get_object_source',
+            description: 'Get the real AL source code (including procedure/trigger bodies) of an object from YOUR WORKSPACE, extracted from the package it was compiled from. Requires a prior al_search_objects or al_get_object_definition call: only works when that result had sourceAvailable=true (the owning package must embed source). Use member to scope to one procedure/trigger, or startLine/endLine for an explicit range; omit both for the full object.',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                objectId: {
+                  type: 'number',
+                  description: 'Object ID',
+                },
+                objectName: {
+                  type: 'string',
+                  description: 'Object name (alternative to ID)',
+                },
+                objectType: {
+                  type: 'string',
+                  description: 'Object type',
+                  enum: ['Table', 'TableExtension', 'Page', 'PageExtension', 'Codeunit', 'Report', 'ReportExtension', 'Enum', 'EnumExtensionType', 'Interface', 'PermissionSet', 'PermissionSetExtension', 'XmlPort', 'Query'],
+                },
+                packageName: {
+                  type: 'string',
+                  description: 'Package (for disambiguation)',
+                },
+                member: {
+                  type: 'string',
+                  description: 'Procedure/trigger name to scope the returned source to',
+                },
+                startLine: {
+                  type: 'number',
+                  description: 'Explicit range start (1-based, requires endLine)',
+                },
+                endLine: {
+                  type: 'number',
+                  description: 'Explicit range end (1-based, requires startLine)',
+                },
+                contextLines: {
+                  type: 'number',
+                  description: 'Extra lines of context around a matched member (default: 3)',
+                  default: 3,
                 },
               },
             },
@@ -323,6 +366,16 @@ export class ALMCPServer {
                 {
                   type: 'text',
                   text: JSON.stringify(await this.tools.getObjectDefinition(args as any), null, 2),
+                },
+              ],
+            };
+
+          case 'al_get_object_source':
+            return {
+              content: [
+                {
+                  type: 'text',
+                  text: JSON.stringify(await this.tools.getObjectSource(args as any), null, 2),
                 },
               ],
             };

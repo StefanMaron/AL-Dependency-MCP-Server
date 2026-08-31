@@ -69,20 +69,7 @@ export class StreamingSymbolParser {
 
       stream.on('end', () => {
         try {
-          this.reportProgress('parsing', 0, undefined, 'Parsing JSON');
-
-          // Strip trailing null characters that may exist in some AppSource packages
-          const cleanJsonData = jsonData.replace(/\0+$/g, '');
-
-          // Parse the complete JSON
-          const symbolReference = JSON.parse(cleanJsonData);
-          
-          this.reportProgress('processing', 0, undefined, 'Processing AL objects');
-
-          // Process all objects recursively
-          const objects = this.processSymbolReference(symbolReference, packageName);
-
-          this.reportProgress('completed', objects.length, objects.length, `Found ${objects.length} AL objects`);
+          const objects = this.parseSymbolReferenceText(jsonData, packageName);
           resolve(objects);
         } catch (error) {
           reject(new Error(`JSON parsing error: ${error}`));
@@ -94,6 +81,31 @@ export class StreamingSymbolParser {
       });
     });
   }
+
+  /**
+   * Parse already-extracted SymbolReference.json text into AL objects.
+   * Used both by the streaming path (after a full read) and by callers that
+   * already have the JSON text on hand (e.g. a single-pass ZIP inspection).
+   */
+  parseSymbolReferenceText(jsonText: string, packageName: string): ALObject[] {
+    this.reportProgress('parsing', 0, undefined, 'Parsing JSON');
+
+    // Strip trailing null characters that may exist in some AppSource packages
+    const cleanJsonData = jsonText.replace(/\0+$/g, '');
+
+    // Parse the complete JSON
+    const symbolReference = JSON.parse(cleanJsonData);
+
+    this.reportProgress('processing', 0, undefined, 'Processing AL objects');
+
+    // Process all objects recursively
+    const objects = this.processSymbolReference(symbolReference, packageName);
+
+    this.reportProgress('completed', objects.length, objects.length, `Found ${objects.length} AL objects`);
+
+    return objects;
+  }
+
 
   /**
    * Process complete SymbolReference JSON recursively

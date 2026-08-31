@@ -123,7 +123,7 @@ The server will auto-start and provide intelligent AL assistance!
 
 ## Available Tools
 
-The AL MCP Server provides 6 token-optimized tools for AL code analysis:
+The AL MCP Server provides 7 token-optimized tools for AL code analysis:
 
 ### Core Query Tools
 
@@ -138,6 +138,12 @@ The AL MCP Server provides 6 token-optimized tools for AL code analysis:
 - Includes fields, procedures, properties, and keys
 - Configurable detail level with field/procedure limits
 - Summary mode for token efficiency
+
+**`al_get_object_source`**
+- Get the real AL source code of an object, extracted from the package it was compiled from
+- Only works when the owning package embeds source (check `sourceAvailable` on search/definition results)
+- Scope to a single procedure/trigger via `member`, or an explicit `startLine`/`endLine` range
+- Warns (but still returns full content) for very large objects instead of truncating
 
 **`al_find_references`**
 - Find all references to an object or field

@@ -30,6 +30,18 @@ export interface GetObjectDefinitionArgs extends MCPToolArgs {
   procedureLimit?: number;
 }
 
+export interface GetObjectSourceArgs extends MCPToolArgs {
+  objectId?: number;
+  objectName?: string;
+  objectType?: string;
+  packageName?: string;
+  member?: string;
+  startLine?: number;
+  endLine?: number;
+  contextLines?: number;
+}
+
+
 export interface FindReferencesArgs extends MCPToolArgs {
   targetName: string;
   referenceType?: string;
@@ -117,6 +129,23 @@ export interface SearchObjectsResult {
 export interface GetObjectDefinitionResult {
   object: ALObjectDefinition;
   summaryMode?: boolean;
+  executionTimeMs: number;
+}
+
+export interface GetObjectSourceResult {
+  objectType: string;
+  objectName: string;
+  objectId: number;
+  packageName: string;
+  sourceFilePath: string;
+  totalLines: number;
+  byteSize: number;
+  mode: 'full' | 'member' | 'range';
+  returnedLines: { start: number; end: number };
+  truncated: boolean;
+  warning?: string;
+  content: string;
+  memberMatches?: string[];
   executionTimeMs: number;
 }
 

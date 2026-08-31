@@ -16,11 +16,192 @@ export interface ExtractedManifest {
   }[];
 }
 
+export interface PackageInspection {
+  manifest: ExtractedManifest;
+  hasSourceCode: boolean;
+  sourceEntries: string[]; // raw (stored, possibly over-encoded) .al entry names
+  symbolReferenceJson: string;
+}
+
 /**
  * Pure Node.js ZIP extractor for AL symbol packages
  * Uses yauzl library - 10x faster than PowerShell, no temp files needed
  */
 export class ZipFallbackExtractor {
+  /**
+   * Read the ZIP portion of an AL package (.app), stripping the 40-byte NAVX
+   * header and any trailing NXSB signature data from signed packages.
+   */
+  private async readZipBuffer(appPath: string): Promise<Buffer> {
+    const buffer = await fs.readFile(appPath);
+
+    const zipStart = this.findZipStart(buffer);
+    if (zipStart === -1) {
+      throw new Error('Not a valid AL package - ZIP signature not found');
+    }
+
+    const zipEnd = this.findZipEnd(buffer);
+    return buffer.slice(zipStart, zipEnd);
+  }
+
+  private openZip(zipBuffer: Buffer): Promise<yauzl.ZipFile> {
+    return new Promise((resolve, reject) => {
+      yauzl.fromBuffer(zipBuffer, { lazyEntries: true }, (err, zipfile) => {
+        if (err) return reject(err);
+        resolve(zipfile!);
+      });
+    });
+  }
+
+  /**
+   * Read an open entry's content as text, stripping a UTF-8 BOM if present.
+   */
+  private readEntryText(zipfile: yauzl.ZipFile, entry: yauzl.Entry): Promise<string> {
+    return new Promise((resolve, reject) => {
+      zipfile.openReadStream(entry, (err, readStream) => {
+        if (err) return reject(err);
+
+        const chunks: Buffer[] = [];
+        readStream!.on('data', (chunk) => chunks.push(chunk));
+        readStream!.on('end', () => {
+          let content = Buffer.concat(chunks);
+          if (content.length >= 3 && content[0] === 0xEF && content[1] === 0xBB && content[2] === 0xBF) {
+            content = content.slice(3);
+          }
+          resolve(content.toString('utf8'));
+        });
+        readStream!.on('error', reject);
+      });
+    });
+  }
+
+  /**
+   * List all entry file names stored in an AL package's ZIP.
+   */
+  async listEntries(appPath: string): Promise<string[]> {
+    const zipBuffer = await this.readZipBuffer(appPath);
+    const zipfile = await this.openZip(zipBuffer);
+
+    return new Promise((resolve, reject) => {
+      const entries: string[] = [];
+
+      zipfile.readEntry();
+      zipfile.on('entry', (entry: yauzl.Entry) => {
+        entries.push(entry.fileName);
+        zipfile.readEntry();
+      });
+      zipfile.on('error', reject);
+      zipfile.on('end', () => resolve(entries));
+    });
+  }
+
+  /**
+   * Extract a single entry's text content by its exact (raw, stored) entry name.
+   */
+  async extractEntry(appPath: string, rawEntryName: string): Promise<string> {
+    const zipBuffer = await this.readZipBuffer(appPath);
+    const zipfile = await this.openZip(zipBuffer);
+
+    return new Promise((resolve, reject) => {
+      let settled = false;
+
+      zipfile.readEntry();
+      zipfile.on('entry', (entry: yauzl.Entry) => {
+        if (settled) return;
+
+        if (entry.fileName === rawEntryName) {
+          settled = true;
+          this.readEntryText(zipfile, entry).then(resolve, reject);
+          return;
+        }
+
+        zipfile.readEntry();
+      });
+      zipfile.on('error', reject);
+      zipfile.on('end', () => {
+        if (!settled) {
+          reject(new Error(`Entry not found in package: ${rawEntryName}`));
+        }
+      });
+    });
+  }
+
+  /**
+   * Single consolidated read of a package: manifest + source-availability flag +
+   * the raw .al entry list + the SymbolReference.json text. This is the only
+   * full-buffer ZIP open needed in the package-load path.
+   */
+  async inspectPackage(appPath: string): Promise<PackageInspection> {
+    const zipBuffer = await this.readZipBuffer(appPath);
+    const zipfile = await this.openZip(zipBuffer);
+
+    return new Promise((resolve, reject) => {
+      const sourceEntries: string[] = [];
+      let manifestXml: string | undefined;
+      let symbolReferenceJson: string | undefined;
+      let settled = false;
+
+      const fail = (error: Error) => {
+        if (settled) return;
+        settled = true;
+        reject(error);
+      };
+
+      zipfile.readEntry();
+      zipfile.on('entry', (entry: yauzl.Entry) => {
+        if (settled) return;
+
+        if (entry.fileName === 'NavxManifest.xml') {
+          this.readEntryText(zipfile, entry)
+            .then((text) => { manifestXml = text; zipfile.readEntry(); })
+            .catch(fail);
+          return;
+        }
+
+        if (entry.fileName === 'SymbolReference.json') {
+          this.readEntryText(zipfile, entry)
+            .then((text) => { symbolReferenceJson = text; zipfile.readEntry(); })
+            .catch(fail);
+          return;
+        }
+
+        if (entry.fileName.toLowerCase().endsWith('.al')) {
+          sourceEntries.push(entry.fileName);
+        }
+
+        zipfile.readEntry();
+      });
+
+      zipfile.on('error', fail);
+      zipfile.on('end', () => {
+        if (settled) return;
+
+        if (manifestXml === undefined) {
+          fail(new Error('NavxManifest.xml not found in package'));
+          return;
+        }
+
+        if (symbolReferenceJson === undefined) {
+          fail(new Error('SymbolReference.json not found in package'));
+          return;
+        }
+
+        try {
+          const manifest = this.parseNavxManifest(manifestXml);
+          settled = true;
+          resolve({
+            manifest,
+            hasSourceCode: sourceEntries.length > 0,
+            sourceEntries,
+            symbolReferenceJson
+          });
+        } catch (parseError) {
+          fail(parseError as Error);
+        }
+      });
+    });
+  }
+
   /**
    * Extract SymbolReference.json from AL symbol package using yauzl
    */
